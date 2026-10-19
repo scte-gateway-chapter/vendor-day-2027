@@ -1,0 +1,46 @@
+rules_version = '2';
+
+// =============================================================================
+// Firebase Storage security rules — Vendor Day 2027 PWA
+// =============================================================================
+//
+// Posture
+// -------
+// Attendees never log in, so sponsor logos, the venue map image, and recap
+// photos must be readable without authentication (design section 10,
+// Requirement 12.8). Writes are denied for every client: admin uploads flow
+// through the `/api/upload` Pages Function (Tasks 19 and 20), which uses the
+// Firebase Admin SDK with the chapter service account to write to Storage.
+// The service account bypasses these rules.
+//
+// If a path is not listed below, every operation on it is denied by the
+// default `match /{allPaths=**}` block at the bottom.
+// =============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Public read on sponsor logos.
+    match /sponsors/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Public read on the venue map image(s).
+    match /venue-map/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Public read on recap photos.
+    match /recap/{allPaths=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Default-deny everything else.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

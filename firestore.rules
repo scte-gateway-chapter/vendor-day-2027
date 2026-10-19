@@ -1,0 +1,82 @@
+rules_version = '2';
+
+// =============================================================================
+// Firestore security rules — Vendor Day 2027 PWA
+// =============================================================================
+//
+// Posture
+// -------
+// Attendees never log in (Requirement 12.8), so all content collections used by
+// the attendee app are publicly readable at the Firestore layer. Writes are
+// denied by default. Admin writes go through the `/api/firestore-write`
+// Pages Function (design section 6), which uses the Firebase Admin SDK with a
+// service account; those writes bypass these rules.
+//
+// Feedback responses are the one place a client writes directly to Firestore.
+// They are anonymous (no attendee identity on the document — design section 5),
+// append-only (clients can create but never read, update, or delete), and the
+// admin reads them server-side via `/api/firestore-write`.
+//
+// If a collection is not listed below, every operation on it is denied by the
+// default `match /{document=**}` block at the bottom.
+// =============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Public content — any browser can read; writes go through the admin broker.
+    match /agenda/{sessionId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /sponsors/{sponsorId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /announcements/{announcementId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /feedbackConfig/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /recap/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    match /appSettings/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Attendees — publicly readable, but only when the document has
+    // `optedOut == false`. For `list` queries Firestore evaluates this rule
+    // against every matched document, so the client query MUST include a
+    // `where('optedOut', '==', false)` filter (see design section 13, "Attendee
+    // opt-out is honored"). Opted-out documents remain in the collection for
+    // admin bookkeeping but are hidden from attendee reads.
+    match /attendees/{attendeeId} {
+      allow get, list: if resource.data.optedOut == false;
+      allow write: if false;
+    }
+
+    // Feedback responses — anonymous, create-only from clients. Clients cannot
+    // read, update, or delete; the admin Results tab reads these server-side
+    // via `/api/firestore-write` using the Admin SDK.
+    match /feedbackResponses/{responseId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+
+    // Default-deny everything else.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
