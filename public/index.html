@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>SCTE Gateway Chapter Vendor Day 2027</title>
+    <meta name="theme-color" content="#2E8B57" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192.png" />
+    <link rel="stylesheet" href="/css/app.css" />
+  </head>
+  <body>
+    <header class="app-header" role="banner">
+      <img
+        class="app-header__logo"
+        src="/assets/brand/gateway-logo.svg"
+        alt="Gateway Chapter SCTE"
+        height="32"
+      />
+      <h1 class="app-header__title">Vendor Day 2027</h1>
+      <button
+        type="button"
+        class="app-header__overflow"
+        aria-label="More options"
+        aria-haspopup="menu"
+        aria-expanded="false"
+      >
+        <span aria-hidden="true">⋯</span>
+      </button>
+    </header>
+
+    <main id="view-root" class="view-root">
+      <section class="placeholder-card" aria-live="polite">
+        <h2>Welcome to the Vendor Day 2027 PWA.</h2>
+        <p>Scaffold is up; features arrive in Task 6 and onward.</p>
+      </section>
+    </main>
+
+    <nav class="tab-bar" role="tablist" aria-label="Main navigation">
+      <button type="button" class="tab-bar__button" role="tab" aria-selected="true" aria-controls="view-root" data-view="home">
+        <span class="tab-bar__label">Home</span>
+      </button>
+      <button type="button" class="tab-bar__button" role="tab" aria-selected="false" aria-controls="view-root" data-view="agenda">
+        <span class="tab-bar__label">Agenda</span>
+      </button>
+      <button type="button" class="tab-bar__button" role="tab" aria-selected="false" aria-controls="view-root" data-view="sponsors">
+        <span class="tab-bar__label">Sponsors</span>
+      </button>
+      <button type="button" class="tab-bar__button" role="tab" aria-selected="false" aria-controls="view-root" data-view="map">
+        <span class="tab-bar__label">Map</span>
+      </button>
+      <button type="button" class="tab-bar__button" role="tab" aria-selected="false" aria-controls="view-root" data-view="more">
+        <span class="tab-bar__label">More</span>
+      </button>
+    </nav>
+
+    <script src="/js/app.js" type="module"></script>
+  </body>
+</html>

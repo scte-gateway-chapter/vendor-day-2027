@@ -1,0 +1,17 @@
+{
+  "name": "vendor-day-2027",
+  "private": true,
+  "version": "0.0.1",
+  "description": "SCTE Gateway Chapter Vendor Day 2027 PWA — vanilla HTML/CSS/JS deployed to Cloudflare Pages.",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node scripts/build-sw.js",
+    "//start": "`npx http-server` is used so a local server can run without adding a runtime dependency.",
+    "start": "npx http-server public -p 8080",
+    "hash-passphrase": "node scripts/hash-passphrase.js"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}

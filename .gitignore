@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Environment / secrets
+.env
+.env.local
+.env.*.local
+
+# Firebase service-account keys (never commit)
+*.firebase-service-account.json
+firebase-adminsdk*.json
+
+# OS cruft
+.DS_Store
+Thumbs.db
+
+# Logs and build output
+*.log
+dist/

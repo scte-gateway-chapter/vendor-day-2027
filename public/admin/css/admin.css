@@ -1,0 +1,91 @@
+/* Scaffolded by Task 2; admin styles expanded in Task 17 and later. */
+
+.admin-body .view-root,
+.admin-view-root {
+  padding: 1rem;
+  padding-bottom: 1rem;
+}
+
+.admin-badge {
+  display: inline-block;
+  margin-left: 0.5rem;
+  padding: 0.125rem 0.5rem;
+  border-radius: var(--radius);
+  background: var(--brand-green);
+  color: #FFF;
+  font-size: 0.75rem;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.admin-header__logout {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 0.75rem;
+  color: var(--brand-green-text);
+  font-weight: 600;
+}
+
+/* Phone-width nav: show the <select>, hide the left rail. */
+.admin-nav-select__label {
+  display: block;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-neutral);
+  background: #FFF;
+}
+
+.admin-nav-select {
+  width: 100%;
+  min-height: 44px;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: #FFF;
+  font-size: 1rem;
+}
+
+.admin-rail {
+  display: none;
+}
+
+.admin-layout {
+  display: block;
+}
+
+/* Tablet and up: left rail nav, hide the select. */
+@media (min-width: 48rem) {
+  .admin-nav-select__label {
+    display: none;
+  }
+
+  .admin-layout {
+    display: grid;
+    grid-template-columns: 14rem 1fr;
+    min-height: calc(100vh - 56px);
+  }
+
+  .admin-rail {
+    display: block;
+    border-right: 1px solid var(--border-neutral);
+    background: #FFF;
+  }
+
+  .admin-rail ul {
+    list-style: none;
+    margin: 0;
+    padding: 0.5rem 0;
+  }
+
+  .admin-rail li a {
+    display: block;
+    padding: 0.75rem 1rem;
+    color: var(--body-text);
+    text-decoration: none;
+  }
+
+  .admin-rail li a:hover,
+  .admin-rail li a:focus-visible {
+    background: var(--success-bg);
+    color: var(--brand-green-text);
+  }
+}

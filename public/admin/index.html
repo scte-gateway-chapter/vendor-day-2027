@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Admin — Vendor Day 2027</title>
+    <meta name="theme-color" content="#2E8B57" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/assets/icons/icon-192.png" />
+    <link rel="stylesheet" href="/css/app.css" />
+    <link rel="stylesheet" href="/admin/css/admin.css" />
+  </head>
+  <body class="admin-body">
+    <header class="app-header admin-header" role="banner">
+      <img
+        class="app-header__logo"
+        src="/assets/brand/gateway-logo.svg"
+        alt="Gateway Chapter SCTE"
+        height="32"
+      />
+      <h1 class="app-header__title">
+        Vendor Day 2027
+        <span class="admin-badge" aria-label="Admin area">Admin</span>
+      </h1>
+      <button type="button" class="admin-header__logout" aria-label="Log out">Log out</button>
+    </header>
+
+    <!-- Phone-width navigation: a dropdown select, visible below the left-rail breakpoint. -->
+    <label class="admin-nav-select__label" for="admin-nav-select">
+      <span class="sr-only">Admin section</span>
+      <select id="admin-nav-select" class="admin-nav-select">
+        <option value="dashboard">Dashboard</option>
+        <option value="agenda">Agenda</option>
+        <option value="sponsors">Sponsors</option>
+        <option value="map">Venue Map</option>
+        <option value="announcements">Announcements</option>
+        <option value="attendees">Attendees</option>
+        <option value="feedback">Feedback</option>
+        <option value="recap">Recap</option>
+        <option value="settings">Settings</option>
+        <option value="logout">Log out</option>
+      </select>
+    </label>
+
+    <div class="admin-layout">
+      <!-- Tablet/desktop navigation: a left rail. -->
+      <nav class="admin-rail" aria-label="Admin sections">
+        <ul>
+          <li><a href="#/dashboard">Dashboard</a></li>
+          <li><a href="#/agenda">Agenda</a></li>
+          <li><a href="#/sponsors">Sponsors</a></li>
+          <li><a href="#/map">Venue Map</a></li>
+          <li><a href="#/announcements">Announcements</a></li>
+          <li><a href="#/attendees">Attendees</a></li>
+          <li><a href="#/feedback">Feedback</a></li>
+          <li><a href="#/recap">Recap</a></li>
+          <li><a href="#/settings">Settings</a></li>
+          <li><a href="#/logout">Log out</a></li>
+        </ul>
+      </nav>
+
+      <main id="admin-view-root" class="admin-view-root">
+        <section class="placeholder-card" aria-live="polite">
+          <h2>Admin shell is up.</h2>
+          <p>Login lands in Task 16.</p>
+        </section>
+      </main>
+    </div>
+
+    <script src="/admin/js/admin.js" type="module"></script>
+  </body>
+</html>

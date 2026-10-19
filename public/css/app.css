@@ -1,0 +1,175 @@
+/* Scaffolded by Task 2; palette and primitives expanded in Task 6. */
+
+:root {
+  --brand-green: #2E8B57;
+  --brand-green-text: #1F6B40;
+  --body-text: #222;
+  --secondary-text: #555;
+  --error-red: #B30000;
+  --error-bg: #FFF0F0;
+  --success-bg: #EAFAF0;
+  --success-border: #C7F0D6;
+  --error-border: #F2C6C6;
+  --border-neutral: #CCC;
+  --radius: 4px;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: "Roboto", Arial, sans-serif;
+  color: var(--body-text);
+  margin: 0;
+  min-height: 100vh;
+  background: #FFF;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* --- Header ---------------------------------------------------------- */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  background: #FFF;
+  border-bottom: 1px solid var(--border-neutral);
+}
+
+.app-header__logo {
+  display: block;
+  height: 2rem;
+  width: auto;
+}
+
+.app-header__title {
+  flex: 1 1 auto;
+  font-size: 1rem;
+  margin: 0;
+  color: var(--body-text);
+}
+
+.app-header__overflow {
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--secondary-text);
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+/* --- Main view region ------------------------------------------------- */
+
+.view-root {
+  padding: 1rem;
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px) + 1rem);
+}
+
+.placeholder-card {
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  padding: 1rem;
+  background: #FFF;
+}
+
+.placeholder-card h2 {
+  margin: 0 0 0.5rem;
+  font-size: 1.125rem;
+  color: var(--brand-green-text);
+}
+
+.placeholder-card p {
+  margin: 0;
+  color: var(--secondary-text);
+  line-height: 1.4;
+}
+
+/* --- Bottom tab bar --------------------------------------------------- */
+
+.tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  height: 56px;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: #FFF;
+  border-top: 1px solid var(--border-neutral);
+}
+
+.tab-bar__button {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  color: var(--secondary-text);
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.tab-bar__button[aria-selected="true"] {
+  color: var(--brand-green-text);
+  font-weight: 600;
+}
+
+.tab-bar__label {
+  display: block;
+}
+
+/* --- Status blocks (carry-forward from prior Vendor Day modules) ----- */
+
+.status-success {
+  padding: 0.75rem;
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius);
+  background: var(--success-bg);
+  color: #2E7D32;
+}
+
+.status-error {
+  padding: 0.75rem;
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius);
+  background: var(--error-bg);
+  color: #7A1B1B;
+}
