@@ -4,9 +4,14 @@
  * values that live in Cloudflare Pages environment variables.
  *
  * Prompts for the admin passphrase on stdin, runs PBKDF2-SHA-256 with
- * 310,000 iterations and a random 16-byte salt, and prints the hash in the
- * single-line format `pbkdf2$sha256$310000$<salt>$<hash>`. Also generates a
+ * 100,000 iterations and a random 16-byte salt, and prints the hash in the
+ * single-line format `pbkdf2$sha256$100000$<salt>$<hash>`. Also generates a
  * random 32-byte base64 ADMIN_JWT_SECRET.
+ *
+ * Iteration count sized for Cloudflare Workers free-tier CPU budget (~10ms
+ * per request). 100,000 iterations is still well within OWASP's recommended
+ * range for PBKDF2-SHA-256 when paired with per-IP rate limiting, which this
+ * app does (5 attempts per 10 minutes).
  *
  * No npm dependencies — Node 18 standard library only.
  */
@@ -15,7 +20,7 @@
 const crypto = require("node:crypto");
 const readline = require("node:readline");
 
-const ITERATIONS = 310000;
+const ITERATIONS = 100000;
 const KEY_LENGTH = 32; // 256 bits
 const SALT_BYTES = 16;
 const DIGEST = "sha256";
