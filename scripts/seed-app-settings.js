@@ -41,12 +41,17 @@ async function main() {
   const resolvedPath = path.resolve(credentialPath);
 
   // Firebase Admin SDK is a devDependency so it only installs when a developer
-  // runs the seed script or Pages Functions locally. Load it lazily so running
-  // the script with no args prints the usage message without needing the
-  // package installed.
-  let admin;
+  // runs the seed script or Pages Functions locally. Use firebase-admin's
+  // modular imports (v10+ API) because the default-namespace export was
+  // removed in v12+ and `require("firebase-admin").credential` is now
+  // undefined.
+  let initializeApp;
+  let cert;
+  let getFirestore;
+  let FieldValue;
   try {
-    admin = require("firebase-admin");
+    ({ initializeApp, cert } = require("firebase-admin/app"));
+    ({ getFirestore, FieldValue } = require("firebase-admin/firestore"));
   } catch (err) {
     console.error("firebase-admin is not installed. Run `npm install` from the project root first.");
     process.exit(1);
@@ -62,11 +67,8 @@ async function main() {
     process.exit(1);
   }
 
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccount),
-  });
-
-  const db = admin.firestore();
+  const app = initializeApp({ credential: cert(serviceAccount) });
+  const db = getFirestore(app);
 
   const appSettings = {
     eventTitle: "SCTE Gateway Chapter Vendor Day 2027",
@@ -76,7 +78,7 @@ async function main() {
     venueMapUrl: null,
     venueMapCaption:
       "Doubletree Chesterfield Exhibit Hall — final map will be posted before the event.",
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
     updatedBy: "seed-script",
   };
 
