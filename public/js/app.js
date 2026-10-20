@@ -15,6 +15,8 @@ import * as ui from "./ui.js";
 import { initFirestore, getDoc } from "./firebase.js";
 import { renderWelcome } from "./views/welcome.js";
 import { renderHome } from "./views/home.js";
+import { renderAgenda } from "./views/agenda.js";
+import { renderAgendaDetail } from "./views/agenda-detail.js";
 
 /** Persistent flag — once the user taps "I'll do this later" we skip Welcome
  *  for every subsequent visit on this device. Cleared only by the user via
@@ -305,8 +307,10 @@ async function main() {
   // and owns `#/`.
   router.register("#/", renderWelcomeRoute);
   router.register("#/home", () => ui.showView((root) => renderHome(root)));
-  router.register("#/agenda", placeholderView("Agenda", "Task 9"));
-  router.register("#/agenda/<id>", placeholderView("Agenda", "Task 9"));
+  router.register("#/agenda", () => ui.showView((root) => renderAgenda(root)));
+  router.register("#/agenda/<id>", (params) =>
+    ui.showView((root) => renderAgendaDetail(root, { id: params.id })),
+  );
   router.register("#/sponsors", placeholderView("Sponsors", "Task 10"));
   router.register("#/sponsors/<id>", placeholderView("Sponsors", "Task 10"));
   router.register("#/map", placeholderView("Venue Map", "Task 11"));

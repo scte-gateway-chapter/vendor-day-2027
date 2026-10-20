@@ -740,6 +740,14 @@ a:focus-visible {
 /* CSS line-clamp works in every evergreen mobile browser via the
    `-webkit-` prefix; `line-clamp` is standardized but still requires the
    prefix for broad coverage. */
+.line-clamp-1 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -747,6 +755,226 @@ a:focus-visible {
   line-clamp: 2;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* ---------- Agenda views (Task 9) ---------- */
+
+/* Secondary sticky header below the main app header. Positions right at
+   the bottom edge of #app-header so it reads as a sub-section banner and
+   stays put while the list scrolls under it. */
+.agenda-sticky-header {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) 0;
+  margin: 0 0 var(--space-md);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-neutral);
+}
+.agenda-sticky-header__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: 600;
+  color: var(--body-text);
+  line-height: var(--line-height-lg);
+}
+.agenda-sticky-header__date {
+  color: var(--secondary-text);
+  font-weight: 400;
+}
+
+/* Back button in the detail view's sticky header. 44x44 touch target with
+   a visible glyph; the "Back" label is sr-only per spec. */
+.agenda-back {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-green-text);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+}
+.agenda-back:hover,
+.agenda-back:focus-visible {
+  background: var(--surface-alt);
+}
+
+.agenda-list {
+  display: block;
+}
+
+.agenda-group {
+  margin-bottom: var(--space-lg);
+}
+
+.agenda-group-label {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--secondary-text);
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: var(--line-height-md);
+}
+
+/* Session card is an anchor so right/middle-click opens naturally. Flex
+   layout keeps the chevron pinned to the trailing edge while the body
+   grows. The relative positioning anchors the "Happening now" badge. */
+.agenda-session-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--body-text);
+  text-decoration: none;
+  margin-bottom: var(--space-sm);
+  min-height: 44px;
+}
+.agenda-session-card:hover,
+.agenda-session-card:focus-visible {
+  background: var(--surface-alt);
+  color: var(--body-text);
+}
+
+.agenda-session-card__body {
+  flex: 1 1 auto;
+  min-width: 0; /* allows the title to clamp on narrow viewports */
+}
+
+.agenda-session-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+
+.agenda-session-meta {
+  margin: 0 0 var(--space-xs);
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.agenda-session-meta:last-child { margin-bottom: 0; }
+
+.agenda-chevron {
+  flex: 0 0 auto;
+  color: var(--secondary-text);
+  font-size: 1.5rem;
+  line-height: 1;
+  padding-left: var(--space-sm);
+}
+
+.agenda-happening-now-badge {
+  position: absolute;
+  top: var(--space-sm);
+  right: var(--space-sm);
+  background: var(--brand-green);
+  color: #FFF;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+}
+
+/* Error strip inside the list when a poll failed but we still have cached
+   content to show beneath it. */
+.agenda-error-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.agenda-error-strip .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* ---------- Agenda detail view ---------- */
+
+.agenda-detail {
+  display: block;
+}
+
+.agenda-detail-section {
+  margin-bottom: var(--space-lg);
+}
+.agenda-detail-section:last-child { margin-bottom: 0; }
+
+.agenda-detail-header {
+  margin-bottom: var(--space-md);
+}
+
+.agenda-detail-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-xl);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-xl);
+}
+
+.agenda-detail-when {
+  margin: 0 0 var(--space-xs);
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+
+.agenda-detail-room {
+  margin: 0;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+
+.agenda-detail-section-title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+
+.agenda-detail-speaker-name {
+  margin: 0 0 var(--space-xs);
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+.agenda-detail-speaker-bio,
+.agenda-detail-description {
+  margin: 0;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+  white-space: pre-wrap;
+}
+
+/* "Add to calendar" row: full-width button on narrow viewports, auto-width
+   at >= 32rem so it reads as a chip rather than a form submit. */
+.calendar-link-row {
+  margin-top: var(--space-lg);
+  display: flex;
+  justify-content: flex-start;
+}
+.calendar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  text-decoration: none;
+}
+.calendar-link__icon {
+  font-size: 1.125rem;
+  line-height: 1;
 }
 
 /* ---------- Simple link list used by the 404 and About views ---------- */
