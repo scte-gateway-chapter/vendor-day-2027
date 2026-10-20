@@ -14,6 +14,7 @@ import * as router from "./router.js";
 import * as ui from "./ui.js";
 import { initFirestore, getDoc } from "./firebase.js";
 import { renderWelcome } from "./views/welcome.js";
+import { renderHome } from "./views/home.js";
 
 /** Persistent flag — once the user taps "I'll do this later" we skip Welcome
  *  for every subsequent visit on this device. Cleared only by the user via
@@ -40,6 +41,36 @@ const ROUTE_TO_TAB = {
   "#/recap": "more",
   "#/about-install": "more",
 };
+
+/* ----------------- Per-view cleanup registry ----------------- */
+
+/** Views that spin up subscriptions, visibility listeners, or similar
+ *  long-lived handles register a teardown here from their render function.
+ *  The router.beforeEach hook drains this before dispatching the next route
+ *  so background work (e.g., the Home view's 15-second agenda poll) stops
+ *  the moment the user navigates away. One slot by design — a view that
+ *  wires multiple handles should compose them into a single function. */
+let pendingViewCleanup = null;
+
+/**
+ * Register (or clear) the current view's teardown. Called by view modules
+ * from their render function. Passing a non-function clears the slot.
+ * @param {() => void} fn
+ */
+export function registerViewCleanup(fn) {
+  pendingViewCleanup = typeof fn === "function" ? fn : null;
+}
+
+function runPendingViewCleanup() {
+  const fn = pendingViewCleanup;
+  pendingViewCleanup = null;
+  if (!fn) return;
+  try {
+    fn();
+  } catch (err) {
+    console.warn("[app] view cleanup failed:", err);
+  }
+}
 
 /* ----------------- Placeholder view factory ----------------- */
 
@@ -273,7 +304,7 @@ async function main() {
   // land in later tasks (Home in 8, etc). Welcome is the first real view
   // and owns `#/`.
   router.register("#/", renderWelcomeRoute);
-  router.register("#/home", placeholderView("Home", "Task 8"));
+  router.register("#/home", () => ui.showView((root) => renderHome(root)));
   router.register("#/agenda", placeholderView("Agenda", "Task 9"));
   router.register("#/agenda/<id>", placeholderView("Agenda", "Task 9"));
   router.register("#/sponsors", placeholderView("Sponsors", "Task 10"));
@@ -287,6 +318,11 @@ async function main() {
   router.register("#/recap", placeholderView("Recap", "Task 15"));
   router.register("#/about-install", renderAboutInstall);
   router.register("*", render404);
+
+  // Drain any view-level teardown before the next route mounts so views that
+  // subscribe to Firestore polls (e.g., Home's happening-now strip) stop
+  // their background work when the user navigates elsewhere.
+  router.beforeEach(() => runPendingViewCleanup());
 
   // After each navigation, update the active tab reflection. The router passes
   // the matched route pattern (not the raw hash) so ROUTE_TO_TAB keys line up.

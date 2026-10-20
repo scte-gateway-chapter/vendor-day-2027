@@ -604,6 +604,151 @@ a:focus-visible {
   line-height: var(--line-height-md);
 }
 
+/* ---------- Home view (Task 8) ---------- */
+
+/* Welcome card: event title big, venue line medium, date line, chapter
+   attribution small. Uses the shared `.card` chrome for padding + border. */
+.home-welcome-card__title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-xl);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-xl);
+}
+.home-welcome-card__venue {
+  margin: 0 0 var(--space-xs);
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.home-welcome-card__date {
+  margin: 0 0 var(--space-sm);
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.home-welcome-card__attribution {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+}
+.home-welcome-card__error {
+  margin: 0 0 var(--space-sm);
+  color: var(--error-text);
+}
+
+/* Happening now: compact alt-surface strip so it reads as live context
+   rather than a card. Min-height keeps the skeleton from collapsing. */
+.home-happening-now {
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  min-height: 44px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.home-happening-now__content {
+  margin: 0;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.home-happening-now__label {
+  font-weight: 600;
+  color: var(--brand-green-text);
+  margin-right: var(--space-xs);
+}
+.home-happening-now__empty {
+  color: var(--secondary-text);
+}
+.home-happening-now__retry {
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-xs) 0;
+  color: var(--error-text);
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+/* Latest announcement card: shared `.card` chrome plus a 2-line clamp on
+   the body preview and a muted meta row with the byline + relative time. */
+.home-announcement-card__title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+.home-announcement-card__body {
+  margin: 0 0 var(--space-sm);
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.home-announcement-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: baseline;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+}
+.home-announcement-card__byline {
+  font-weight: 600;
+}
+.home-announcement-card__empty {
+  margin: 0;
+  color: var(--secondary-text);
+}
+.home-announcement-card__error {
+  margin: 0 0 var(--space-sm);
+  color: var(--error-text);
+}
+.home-announcement-card__retry {
+  min-height: 44px;
+  padding: 0;
+  color: var(--brand-green-text);
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* Quick actions: stacked on narrow viewports, side-by-side at >= 32rem. */
+.home-quick-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+@media (min-width: 32rem) {
+  .home-quick-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Shared Home utilities ---------- */
+
+.text-muted {
+  color: var(--muted-text);
+}
+
+.relative-time {
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text);
+}
+
+/* CSS line-clamp works in every evergreen mobile browser via the
+   `-webkit-` prefix; `line-clamp` is standardized but still requires the
+   prefix for broad coverage. */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ---------- Simple link list used by the 404 and About views ---------- */
 
 .inline-link-list {
