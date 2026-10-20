@@ -1892,3 +1892,257 @@ a:focus-visible {
     border-radius: 0;
   }
 }
+
+/* ---------- Feedback view (Task 14) ---------- */
+
+/* Form owns its own vertical rhythm so questions sit as a stacked list
+   with clear separation between blocks. Capped at the shared form clamp
+   so the inputs don't stretch to desktop width. */
+.feedback-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  max-width: var(--max-form-width);
+}
+
+/* Each question is either a <fieldset> (rating) or a <div> (text) — the
+   shared selector keeps the vertical rhythm consistent across types. */
+.feedback-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: 0;
+  margin: 0;
+  border: none;
+}
+
+/* Legend/label vocabulary. Both are rendered with the same weight so a
+   rating fieldset reads the same as a text label. The legend is a block
+   element inside a fieldset — flex display lines up the required marker
+   with the text baseline. */
+.feedback-question__legend,
+.feedback-question__label {
+  display: block;
+  font-weight: 600;
+  color: var(--body-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  padding: 0;
+  margin: 0;
+}
+
+.feedback-required-marker {
+  color: var(--error-red);
+  margin-left: 4px;
+}
+
+/* Rating: horizontal row of five square radios. Each label is a 44x44
+   touch target. The native radio input is visually hidden but kept in
+   the DOM so native arrow-key navigation (ARIA radio group pattern via
+   shared `name`) still works for keyboard users. */
+.feedback-rating-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.feedback-rating-radio {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--body-text);
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.feedback-rating-radio:hover,
+.feedback-rating-radio:focus-within {
+  background: var(--surface-alt);
+}
+
+/* Native input hidden visually but still focusable so arrow-key
+   navigation and screen readers continue to work. We draw the focus
+   ring on the parent label via :focus-within so the hidden input's
+   focus still reads to sighted keyboard users. */
+.feedback-rating-radio__input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+  margin: 0;
+}
+
+.feedback-rating-radio:focus-within {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}
+
+/* Checked state uses brand-green fill so the picked rating is obvious
+   at a glance even without reading the number. */
+.feedback-rating-radio:has(.feedback-rating-radio__input:checked) {
+  background: var(--brand-green);
+  color: #FFF;
+  border-color: var(--brand-green);
+}
+
+.feedback-rating-radio__label {
+  font-size: var(--font-size-md);
+  line-height: 1;
+}
+
+/* Text + textarea share the look of `.form-field` inputs so the
+   feedback form feels like the rest of the app's form chrome. */
+.feedback-input,
+.feedback-textarea {
+  font: inherit;
+  padding: 10px;
+  font-size: 16px; /* 16px prevents iOS from auto-zooming on focus */
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--body-text);
+  min-height: 44px;
+  width: 100%;
+}
+.feedback-textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+/* Invalid state highlights the field in error-red so sighted users see
+   the problem immediately; `aria-invalid` on the field drives screen
+   reader announcements. */
+.feedback-question[aria-invalid="true"] .feedback-input,
+.feedback-question[aria-invalid="true"] .feedback-textarea,
+.feedback-question[aria-invalid="true"] .feedback-rating-group {
+  border-color: var(--error-red);
+}
+
+.feedback-inline-error {
+  color: var(--error-red);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.feedback-inline-error[hidden] { display: none; }
+
+/* Inline submit banner: composes with the shared `.status-error` chrome
+   so the red tone matches other error strips (Agenda, Sponsors, Map,
+   Attendees). This local class just adds the flex layout for an optional
+   Retry button on the trailing edge. Scrolled into view by the submit
+   handler so the user doesn't miss it below the fold. The CSS variable
+   name is `--feedback-offline-banner` in spirit; the class name is
+   `--inline-banner` because the same element also carries the submit-
+   error state. */
+.feedback-offline-banner,
+.feedback-inline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.feedback-inline-banner[hidden] { display: none; }
+.feedback-inline-banner .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+  flex: 0 0 auto;
+}
+
+/* Submit button holds a spinner that fades in when the submit is in
+   flight (`feedback-submit-btn--loading`). CSS-only — no SVG, no JS
+   animation handles. The native button chrome comes from `.btn-primary`. */
+.feedback-form__actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.feedback-submit-btn {
+  position: relative;
+  width: 100%;
+}
+@media (min-width: 32rem) {
+  .feedback-submit-btn {
+    width: auto;
+    align-self: flex-start;
+    min-width: 12rem;
+  }
+}
+
+.feedback-submit-btn__spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  margin-right: var(--space-sm);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #FFF;
+  border-radius: 50%;
+  animation: feedback-spin 0.9s linear infinite;
+}
+.feedback-submit-btn--loading .feedback-submit-btn__spinner {
+  display: inline-block;
+}
+@keyframes feedback-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .feedback-submit-btn__spinner { animation: none; }
+}
+
+/* Confirmation card — reuses the success palette tokens so it reads as
+   part of the shared success vocabulary (status-success, toast--success). */
+.feedback-confirmation-card {
+  padding: var(--space-md);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.feedback-confirmation-card__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--success-text);
+  line-height: var(--line-height-lg);
+}
+
+.feedback-confirmation-card__meta {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--success-text);
+  line-height: var(--line-height-sm);
+}
+
+.feedback-confirmation-card__body {
+  margin: 0;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+
+.feedback-confirmation-card__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+/* Loading skeleton — a question-shaped block so the first paint stays
+   close to the real form footprint. The shared `.skeleton-row` shimmer
+   powers the inner rows. */
+.skeleton-feedback-question {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}

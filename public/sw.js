@@ -6,9 +6,9 @@
 // service worker on first deploy and the production URL demonstrates the
 // PWA plumbing works end-to-end.
 
-const SHELL_CACHE = "shell-v1792518424845";
-const CONTENT_CACHE = "content-v1792518424845";
-const IMAGES_CACHE = "images-v1792518424845";
+const SHELL_CACHE = "shell-v1792519617787";
+const CONTENT_CACHE = "content-v1792519617787";
+const IMAGES_CACHE = "images-v1792519617787";
 
 self.addEventListener("install", (event) => {
   // Full pre-cache of the app shell lands in Task 26. For now, take over

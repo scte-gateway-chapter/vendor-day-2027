@@ -181,20 +181,33 @@ const OP_MAP = {
   "array-contains-any": "ARRAY_CONTAINS_ANY",
 };
 
-function jsValueToFirestoreValue(v) {
+/**
+ * Convert a plain JS value to a Firestore REST typed value. Mirrors the
+ * server-side `firestorePayloadFromObject` in `_google-auth.js`: supports
+ * string, boolean, finite number (int vs double by `Number.isInteger`),
+ * `null`/`undefined`, arrays, and plain objects. ISO date strings pass
+ * through as `stringValue` (Firestore accepts strings; v1 writes feedback
+ * `submittedAt` as an ISO string per the schema in design section 5).
+ * @param {*} v
+ * @returns {object} Firestore typed value
+ */
+export function jsToFirestoreValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === "string") return { stringValue: v };
   if (typeof v === "boolean") return { booleanValue: v };
   if (typeof v === "number") {
+    if (!Number.isFinite(v)) {
+      throw new Error("Non-finite numbers are not supported by Firestore REST");
+    }
     return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
   }
-  if (Array.isArray(v)) return { arrayValue: { values: v.map(jsValueToFirestoreValue) } };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(jsToFirestoreValue) } };
   if (typeof v === "object") {
     const fields = {};
-    for (const [k, inner] of Object.entries(v)) fields[k] = jsValueToFirestoreValue(inner);
+    for (const [k, inner] of Object.entries(v)) fields[k] = jsToFirestoreValue(inner);
     return { mapValue: { fields } };
   }
-  return { nullValue: null };
+  throw new Error(`Unsupported Firestore value type: ${typeof v}`);
 }
 
 /**
@@ -232,7 +245,7 @@ export async function getCollection(path, opts = {}) {
       fieldFilter: {
         field: { fieldPath: where.field },
         op,
-        value: jsValueToFirestoreValue(where.value),
+        value: jsToFirestoreValue(where.value),
       },
     };
   }
@@ -313,4 +326,81 @@ export function onSnapshot(path, callback, opts = {}) {
     cancelled = true;
     if (timer != null) clearTimeout(timer);
   };
+}
+
+/**
+ * Create a new Firestore document at `<collectionPath>/<uuid>` with a
+ * client-generated id (`crypto.randomUUID`). The call goes DIRECT to the
+ * Firestore REST endpoint — not through the admin broker — so
+ * `firestore.rules` must grant `allow create` for the target collection.
+ * v1 uses this only for `feedbackResponses` (anonymous, create-only).
+ * On success returns the created doc converted via `firestoreDocToJs`.
+ * On non-2xx throws an Error with the Firestore error text and attaches
+ * `status` so callers can branch (e.g., 403 = rule denial, 429 = quota).
+ * Lazily primes `/api/config` via `initFirestore()` for first-time callers.
+ * @param {string} collectionPath e.g. "feedbackResponses"
+ * @param {object} data Plain JS object; nested objects/arrays supported.
+ * @returns {Promise<object>}
+ */
+export async function createDoc(collectionPath, data) {
+  if (!collectionPath || typeof collectionPath !== "string") {
+    throw new Error("createDoc requires a non-empty collection path");
+  }
+  if (data === null || typeof data !== "object" || Array.isArray(data)) {
+    throw new Error("createDoc requires a plain object `data`");
+  }
+  if (!config) await initFirestore();
+  const { firebaseProjectId, firebaseWebApiKey } = getConfig();
+
+  const docId = (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function")
+    ? crypto.randomUUID()
+    : fallbackUuid();
+
+  const fields = {};
+  for (const [k, v] of Object.entries(data)) fields[k] = jsToFirestoreValue(v);
+
+  const encodedCollection = collectionPath
+    .split("/")
+    .filter(Boolean)
+    .map(encodeURIComponent)
+    .join("/");
+  const url =
+    `${BASE}/projects/${firebaseProjectId}/databases/(default)/documents/${encodedCollection}` +
+    `?documentId=${encodeURIComponent(docId)}&key=${encodeURIComponent(firebaseWebApiKey)}`;
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify({ fields }),
+  });
+  const text = await res.text();
+  let parsed = null;
+  if (text) {
+    try { parsed = JSON.parse(text); } catch (_err) { /* non-JSON surfaced below */ }
+  }
+  if (!res.ok) {
+    const message = parsed?.error?.message
+      || (typeof parsed === "string" ? parsed : null)
+      || text
+      || `createDoc failed with ${res.status}`;
+    const err = new Error(`createDoc(${collectionPath}) failed: ${message}`);
+    err.status = res.status;
+    throw err;
+  }
+  return firestoreDocToJs(parsed);
+}
+
+/** RFC 4122 v4 fallback for environments without `crypto.randomUUID`
+ *  (older iOS Safari on insecure contexts). */
+function fallbackUuid() {
+  const bytes = new Uint8Array(16);
+  if (typeof crypto !== "undefined" && typeof crypto.getRandomValues === "function") {
+    crypto.getRandomValues(bytes);
+  } else {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const h = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }

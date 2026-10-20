@@ -23,6 +23,7 @@ import { renderMap } from "./views/map.js";
 import { renderAnnouncements } from "./views/announcements.js";
 import { renderAttendees } from "./views/attendees.js";
 import { renderAttendeeDetail } from "./views/attendees-detail.js";
+import { renderFeedback } from "./views/feedback.js";
 
 /** Persistent flag — once the user taps "I'll do this later" we skip Welcome
  *  for every subsequent visit on this device. Cleared only by the user via
@@ -332,7 +333,7 @@ async function main() {
   router.register("#/attendees/<id>", (params) =>
     ui.showView((root) => renderAttendeeDetail(root, { id: params.id })),
   );
-  router.register("#/feedback", placeholderView("Feedback", "Task 14"));
+  router.register("#/feedback", () => ui.showView((root) => renderFeedback(root)));
   router.register("#/recap", placeholderView("Recap", "Task 15"));
   router.register("#/about-install", renderAboutInstall);
   router.register("*", render404);
