@@ -19,6 +19,7 @@ import { renderAgenda } from "./views/agenda.js";
 import { renderAgendaDetail } from "./views/agenda-detail.js";
 import { renderSponsors } from "./views/sponsors.js";
 import { renderSponsorDetail } from "./views/sponsors-detail.js";
+import { renderMap } from "./views/map.js";
 
 /** Persistent flag — once the user taps "I'll do this later" we skip Welcome
  *  for every subsequent visit on this device. Cleared only by the user via
@@ -317,7 +318,7 @@ async function main() {
   router.register("#/sponsors/<id>", (params) =>
     ui.showView((root) => renderSponsorDetail(root, { id: params.id })),
   );
-  router.register("#/map", placeholderView("Venue Map", "Task 11"));
+  router.register("#/map", () => ui.showView((root) => renderMap(root)));
   router.register("#/announcements", placeholderView("Announcements", "Task 12"));
   router.register("#/announcements/<id>", placeholderView("Announcements", "Task 12"));
   router.register("#/attendees", placeholderView("Attendee Directory", "Task 13"));

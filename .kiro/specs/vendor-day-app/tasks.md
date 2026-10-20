@@ -107,7 +107,7 @@ Account creation (OneSignal, Firebase, GitHub, Cloudflare, GoDaddy DNS edits) is
   - Implement pinch-to-zoom via `touch-action: pinch-zoom` on the image container and double-tap zoom via JS; wrap in a scrollable container so panning works at zoom
   - Render the caption / legend text from `appSettings.venueMapCaption` beneath the image
   - Implement empty, loading, error, and offline states per design section 4 (placeholder image with "Final map will be posted before the event" watermark when `venueMapUrl` is null; cached image served offline)
-  - Files: `public/js/views/map.js`, `public/assets/placeholders/venue-map-placeholder.png`
+  - Files: `public/js/views/map.js`, `public/assets/placeholders/venue-map-placeholder.svg`
   - Verify: `#/map` renders the placeholder with the watermark when `venueMapUrl` is null; pinch and double-tap zoom both work in a mobile emulator; after task 20 uploads a real map, `#/map` renders the uploaded image
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5, 11.2_
 
