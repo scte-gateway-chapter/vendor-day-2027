@@ -25,14 +25,13 @@ Account creation (OneSignal, Firebase, GitHub, Cloudflare, GoDaddy DNS edits) is
   - Verify: `npm run build` succeeds locally and `public/sw.js` ends up with a stamped cache name; `npx http-server public` serves `index.html` and `admin/index.html` without 404s
   - _Requirements: 11.1, 11.5_
 
-- [ ] 3. Configure Firebase (Firestore, Storage, security rules)
-  - In the Firebase console (user action), enable Firestore in native mode and enable Firebase Storage; the implementer validates both are reachable
+- [ ] 3. Configure Firebase (Firestore security rules)
+  - In the Firebase console (user action), enable Firestore in native mode; the implementer validates it is reachable. (Firebase Storage is NOT used — user-uploaded assets live in Cloudflare R2; see design section 2 and the R2 setup in `docs/deployment.md`.)
   - Author `firestore.rules` enforcing public read on `agenda`, `sponsors`, `announcements`, `attendees` (with `optedOut == false`), `feedbackConfig`, `recap`, `appSettings`; deny all client writes; grant feedback response create via rules (public write-only, no read) OR require routing through `/api/firestore-write` — pick route-through for consistency with other writes and document it in the rule comments
-  - Author `storage.rules` allowing public read on `/sponsors/`, `/venue-map/`, `/recap/`; deny all client writes (writes brokered server-side with the service-account key)
   - Deploy the rules through the Firebase CLI from a local developer machine (document the one-time steps in `docs/deployment.md`); do not commit the service-account JSON to the repo
   - Create the `appSettings/singleton` document with placeholder defaults from design section 5 so initial reads succeed
-  - Files: `firestore.rules`, `storage.rules`, a short `firebase.json` scoping the rules deploy, seed script `scripts/seed-app-settings.js`
-  - Verify: `firebase deploy --only firestore:rules,storage:rules` succeeds; a quick anonymous browser read against the `appSettings/singleton` document returns the seeded doc; an anonymous write attempt is rejected
+  - Files: `firestore.rules`, a short `firebase.json` scoping the rules deploy, seed script `scripts/seed-app-settings.js`
+  - Verify: `firebase deploy --only firestore:rules` succeeds; a quick anonymous browser read against the `appSettings/singleton` document returns the seeded doc; an anonymous write attempt is rejected
   - _Requirements: 10.1, 10.4, 10.5, 12.9, 12.10, 12.11_
 
 - [ ] 4. Create and bind the Cloudflare Pages project
@@ -45,13 +44,14 @@ Account creation (OneSignal, Firebase, GitHub, Cloudflare, GoDaddy DNS edits) is
   - Verify: production URL serves the shell over HTTPS with a valid cert; preview URL serves the same shell; a `curl -I` to the production URL returns `strict-transport-security` and a 200
   - _Requirements: 11.5, 12.11_
 
-- [ ] 5. Author the Pages Functions skeletons for admin login, Firestore writes, and push send
+- [ ] 5. Author the Pages Functions skeletons for admin login, Firestore writes, push send, and asset upload
   - Implement `functions/admin-login.js`: POST handler that reads the submitted passphrase, re-derives PBKDF2 with the stored salt baked into `ADMIN_PASSPHRASE_HASH`, constant-time compares, issues a 12-hour HS256 JWT signed with `ADMIN_JWT_SECRET` on success, applies the Cloudflare-KV-backed rate limiter (5 failures / 10 min / IP → 429 with `Retry-After`), returns 401 on mismatch
   - Implement `functions/firestore-write.js`: POST handler that validates the admin JWT, loads the Firebase Admin SDK with `FIREBASE_SERVICE_ACCOUNT_JSON`, accepts `{ collection, docId, data, op: "set" | "update" | "delete" }`, writes, and returns the resulting server timestamp; rejects unknown collections and documents outside the whitelist of writable collections
   - Implement `functions/send-push.js`: POST handler that validates the admin JWT, calls `POST https://onesignal.com/api/v1/notifications` with `included_segments: ["All"]`, `headings`, `contents`, and a `url` of `https://2027vendorday.gatewayscte.org/#/announcements/<id>`; on OneSignal 200 performs a secondary `firestore-write` to flip `pushSent: true` and set `pushSentAt`; surfaces OneSignal error messages verbatim on non-200
-  - Add a KV namespace binding `ADMIN_LOGIN_RATE` in Cloudflare for the login rate limiter and document the binding in `docs/deployment.md`
-  - Files: `functions/admin-login.js`, `functions/firestore-write.js`, `functions/send-push.js`, `functions/_shared/jwt.js`, `functions/_shared/rate-limit.js`
-  - Verify: deploy to Pages; `curl -X POST https://<preview>/api/admin-login -d '{"passphrase":"wrong"}'` returns 401 and increments the KV counter; six wrong attempts in rapid succession return 429; a correct passphrase returns a JWT; `/api/firestore-write` rejects a request without `Authorization: Bearer <jwt>` with 401
+  - Implement `functions/api/upload.js`: POST handler that validates the admin JWT, parses `multipart/form-data` (`file`, `kind` ∈ {`sponsor`, `venue-map`, `recap`}, optional `id`), enforces the 5 MB cap and the content-type allow-list (`image/png`, `image/jpeg`, `image/webp`, plus `image/svg+xml` for sponsors only), writes to the Cloudflare R2 binding `env.ASSETS_BUCKET` under the key convention from design section 2, and returns `{ url, key, size, contentType }` with the public URL composed from `env.R2_PUBLIC_URL`
+  - Add a KV namespace binding `ADMIN_LOGIN_RATE` in Cloudflare for the login rate limiter and an R2 binding `ASSETS_BUCKET` → `vendor-day-2027-assets` for the upload Function; document both bindings in `docs/deployment.md`
+  - Files: `functions/api/admin-login.js`, `functions/api/firestore-write.js`, `functions/api/send-push.js`, `functions/api/upload.js`, `functions/_shared/_jwt.js`, `functions/_shared/_rate-limit.js`
+  - Verify: deploy to Pages; `curl -X POST https://<preview>/api/admin-login -d '{"passphrase":"wrong"}'` returns 401 and increments the KV counter; six wrong attempts in rapid succession return 429; a correct passphrase returns a JWT; `/api/firestore-write` and `/api/upload` both reject requests without `Authorization: Bearer <jwt>` with 401
   - _Requirements: 6.2, 10.1, 10.2, 10.3, 10.6, 10.7_
 
 - [ ] 6. Build the shared client primitives (router, Firestore read client, UI shell, palette)
@@ -184,17 +184,17 @@ Account creation (OneSignal, Firebase, GitHub, Cloudflare, GoDaddy DNS edits) is
 
 - [ ] 19. Build the admin Sponsor editor
   - Create `public/admin/js/sponsors-editor.js` with the tier-grouped list, within-tier reorder handles (updates `order`), and an "Add sponsor" modal capturing `name`, `tier`, `boothNumber`, `website`, `email`, `description`, and `logo` file picker
-  - On logo upload, POST the file through `/api/firestore-write` (or a parallel `/api/upload` function in `functions/upload.js` added here) which writes to Firebase Storage under `/sponsors/<id>/<filename>` with the Admin SDK and returns the public URL to store on the sponsor document
+  - On logo upload, POST a `multipart/form-data` body to `/api/upload` with fields `file` (the image), `kind=sponsor`, and `id=<sponsorId>`; the Function writes to Cloudflare R2 under `sponsors/<id>/<timestamp>.<ext>` and returns `{ url, key, size, contentType }`. Store the returned `url` on the sponsor's `logoUrl` field via `/api/firestore-write`
   - Validate URL fields: `website` must parse as `https://` if provided; `email` must look like `local@domain` if provided
   - Apply the same collision safeguard as the Agenda editor
-  - Depends on task 10 (viewer) and task 16 (admin auth)
-  - Files: `public/admin/js/sponsors-editor.js`, `functions/upload.js`
-  - Verify: add a sponsor with a logo → sponsor appears on the attendee Sponsor view with the logo rendering from the Storage URL; reorder two sponsors in the same tier → the attendee list reflects the new order on next read
+  - Depends on task 10 (viewer) and task 16 (admin auth); the `/api/upload` Function is authored in task 5
+  - Files: `public/admin/js/sponsors-editor.js`
+  - Verify: add a sponsor with a logo → sponsor appears on the attendee Sponsor view with the logo rendering from the R2 public URL (`https://pub-<hash>.r2.dev/sponsors/<id>/...`); reorder two sponsors in the same tier → the attendee list reflects the new order on next read
   - _Requirements: 10.4, 10.5, 10.9, 10.10_
 
 - [ ] 20. Build the admin Venue Map uploader
   - Create `public/admin/js/map-uploader.js` with current-image preview, "Replace image" file picker (accepts `image/png` or `image/jpeg`, max 5 MB enforced client-side with inline error), caption textarea bound to `appSettings.venueMapCaption`, and a Save button
-  - Upload goes through the same `/api/upload` function as sponsors but writes to `/venue-map/<timestamp>.<ext>`; on success, write `appSettings.venueMapUrl` and `venueMapCaption` through `/api/firestore-write`
+  - Upload goes through the same `/api/upload` Function as sponsors with `multipart/form-data` fields `file` (the image) and `kind=venue-map` (`id` is ignored for this kind); the Function writes to R2 under `venue-map/<timestamp>.<ext>`. On success, write `appSettings.venueMapUrl` (the returned public `url`) and `venueMapCaption` through `/api/firestore-write`
   - Show an upload progress bar during the file transfer; keep the original image visible on failure with inline "Upload failed — try again"
   - Depends on task 11 (viewer) and task 16 (admin auth); this task is intentionally admin-first because without the uploader there is nothing to view beyond the placeholder
   - Files: `public/admin/js/map-uploader.js`
@@ -230,7 +230,7 @@ Account creation (OneSignal, Firebase, GitHub, Cloudflare, GoDaddy DNS edits) is
   - _Requirements: 8.1, 8.6, 10.4, 10.10_
 
 - [ ] 24. Build the admin Recap editor
-  - Create `public/admin/js/recap-editor.js` with: thank-you message textarea, acknowledgments textarea (markdown), photo uploader (same upload function as sponsors / map but writes to `/recap/<id>-<filename>`), drag-reorder of photos, Publish button, and a "Send a push when I publish" checkbox
+  - Create `public/admin/js/recap-editor.js` with: thank-you message textarea, acknowledgments textarea (markdown), photo uploader (POST `multipart/form-data` to `/api/upload` with `kind=recap` and `id=<photoId>`; the Function writes to R2 under `recap/<photoId>.<ext>` — same photo id re-uploaded replaces the previous object), drag-reorder of photos, Publish button, and a "Send a push when I publish" checkbox
   - On Publish, write `recap/singleton` with `published: true` and `publishedAt`; if the checkbox is checked, POST to `/api/send-push` with a short "The 2027 recap is up" message pointing at `#/recap`
   - Depends on task 15 (viewer), task 16 (admin auth), task 5 (`/api/send-push`)
   - Files: `public/admin/js/recap-editor.js`
@@ -254,7 +254,7 @@ Account creation (OneSignal, Firebase, GitHub, Cloudflare, GoDaddy DNS edits) is
   - Replace the task-2 stub `public/sw.js` with the tiered strategy from design section 8:
     - App shell (`/`, `/index.html`, `/admin/index.html`, main CSS, main JS, icon set, manifest, offline fallback page): cache-first in `shell-v<BUILD_ID>`; pre-cache the full list on `install`; delete older `shell-v*` caches on `activate`
     - Content JSON (Firestore REST responses matched by URL): network-first with cache fallback in `content-v<BUILD_ID>`; on fetch failure set a global offline flag the UI reads
-    - Images (sponsor logos, venue map, recap photos matched by Firebase Storage URL): cache-first in `images-v<BUILD_ID>` with a simple "delete oldest N on quota" eviction when count > 60 or approximate total size > 15 MB
+    - Images (sponsor logos, venue map, recap photos matched by the Cloudflare R2 public URL — `pub-<hash>.r2.dev`): cache-first in `images-v<BUILD_ID>` with a simple "delete oldest N on quota" eviction when count > 60 or approximate total size > 15 MB
     - Feedback submissions: online-only, no queueing; let the client fail loudly per task 14
   - Call `self.skipWaiting()` on `install` and `self.clients.claim()` on `activate` so new deploys propagate on the next visit without a hard refresh
   - Emit a `message` event to clients when a new version activates; `public/js/ui.js` listens and renders the "App updated — tap to reload" bottom banner
@@ -285,7 +285,7 @@ Account creation (OneSignal, Firebase, GitHub, Cloudflare, GoDaddy DNS edits) is
   - _Requirements: 3.5, 4.5, 5.4, 6.3, 7.6, 8.4, 11.3_
 
 - [ ] 29. Author the deployment and admin runbooks
-  - Write `docs/deployment.md` covering: Cloudflare Pages project settings (Framework None, build command, Node 18), the full env var table from design section 10 marked public vs secret, custom domain binding steps, the KV namespace binding for the login rate limiter, Firebase CLI steps for deploying `firestore.rules` and `storage.rules`, the two-service-worker arrangement (`/sw.js` and `/OneSignalSDKWorker.js`), how to rotate `ADMIN_JWT_SECRET` to invalidate all admin sessions, how to produce a new `ADMIN_PASSPHRASE_HASH` with the hashing script
+  - Write `docs/deployment.md` covering: Cloudflare Pages project settings (Framework None, build command, Node 18), the full env var table from design section 10 marked public vs secret, custom domain binding steps, the KV namespace binding for the login rate limiter, the R2 bucket + `ASSETS_BUCKET` binding + `R2_PUBLIC_URL` env var setup, Firebase CLI steps for deploying `firestore.rules`, the two-service-worker arrangement (`/sw.js` and `/OneSignalSDKWorker.js`), how to rotate `ADMIN_JWT_SECRET` to invalidate all admin sessions, how to produce a new `ADMIN_PASSPHRASE_HASH` with the hashing script
   - Write `docs/admin-runbook.md` covering: how to sign in at `/admin`, how to edit each content area, how to compose an announcement with and without push, how to export the registration Google Sheet to CSV and import it, how to replace the venue map, how to activate the feedback form and export results, how to publish the recap, and the "sign out everywhere" procedure (rotate `ADMIN_JWT_SECRET`)
   - Document the Google Sheet URL as a reference link for the admins (so the sheet URL does NOT ship in the app code)
   - Files: `docs/deployment.md`, `docs/admin-runbook.md`, `docs/provisioning-checklist.md` (from task 1)

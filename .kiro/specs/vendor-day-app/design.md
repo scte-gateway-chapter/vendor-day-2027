@@ -21,6 +21,20 @@ Candidates considered:
 
 **Decision: Firebase Firestore on the Spark free plan.** It is the lightest free-tier option that gives us (a) direct browser writes from the admin UI with no server component, (b) a real-time snapshot API so attendee devices get agenda and announcement updates within seconds, (c) sufficient free quota for an event of a few hundred attendees for an entire year, and (d) no new deploy pipeline. Writes are gated by the admin passphrase check at the application layer, and Firestore security rules enforce "reads are public, writes require a specific Firebase App Check token issued only to admins" (details in section 6). Vendor-lock risk is low because the data model is a flat set of JSON documents and could be migrated to Supabase or JSON files later.
 
+### Asset storage: Cloudflare R2
+
+User-uploaded images (sponsor logos, the venue map, and recap photos) live in a **Cloudflare R2** bucket named `vendor-day-2027-assets`. The original design called for Firebase Storage, but Firebase changed its policy in 2026 to require the paid Blaze plan for any Storage usage, which breaks our free-tier posture. R2's free tier (10 GB storage, 1 M writes/month, 10 M reads/month, zero egress) is a clean replacement and keeps every runtime dependency in Cloudflare.
+
+Public reads are served directly from the bucket's **public access URL** — a `https://pub-<hash>.r2.dev` hostname that Cloudflare assigns when public access is enabled on the bucket. The attendee client renders these URLs in plain `<img src>` tags; there is no proxy, no signed URL, and no egress cost. The absolute URL is stored on the Firestore document (`sponsors[*].logoUrl`, `appSettings.venueMapUrl`, `recap.photos[*].url`), so view code never has to compose a URL.
+
+Writes go through a new Pages Function `functions/api/upload.js`, gated by the same admin JWT as `/api/firestore-write`. The function reads `multipart/form-data` (field names `file`, `kind`, `id`) and writes to R2 via the Pages-bound namespace `env.ASSETS_BUCKET`. Object keys follow a stable convention so re-uploads are predictable:
+
+- Sponsor logos: `sponsors/<sponsorId>/<timestamp>.<ext>` (timestamped so cached copies invalidate on replace)
+- Venue map: `venue-map/<timestamp>.<ext>` (same reason)
+- Recap photos: `recap/<photoId>.<ext>` (stable key per photo id; display order lives on the recap document)
+
+The R2 public hostname is also exposed to the browser via `/api/config` as `assetsBaseUrl` for future callers that want to resolve a bare object key — v1 does not need this because the Firestore docs carry absolute URLs.
+
 ### Push notifications
 **OneSignal free tier** (unlimited web push subscribers, broadcast sends). The attendee side uses the OneSignal Web SDK to request permission and register the subscription. The admin side composes an announcement in the in-app admin UI, which then calls OneSignal's REST API `POST /notifications` to broadcast. The OneSignal REST API key is stored as a secret environment variable at Cloudflare Pages and reached through a tiny Pages Function (`/api/send-push`) so the key never ships to the browser.
 
@@ -50,17 +64,22 @@ Candidates considered for pulling attendee rows from the registration Google She
              |   - static HTML/CSS/JS    |
              |   - service worker        |
              |   - /api/send-push (fn)   |---> OneSignal REST (push broadcast)
-             +------+-----------+--------+
-                    |           |
-       public read  |           | admin writes
-                    v           v
-             +---------------------------+
-             |  Firebase Firestore       |
-             |   agenda, sponsors,       |
-             |   announcements,          |
-             |   attendees, feedback,    |
-             |   recap, appSettings      |
-             +---------------------------+
+             |   - /api/upload   (fn)    |---> Cloudflare R2
+             +------+-----------+--------+     (vendor-day-2027-assets)
+                    |           |                  ^
+       public read  |           | admin writes     | admin uploads via
+                    v           v                  | env.ASSETS_BUCKET
+             +---------------------------+   +---------------------------+
+             |  Firebase Firestore       |   |  Cloudflare R2            |
+             |   agenda, sponsors,       |   |  (vendor-day-2027-assets) |
+             |   announcements,          |   |   sponsors/<id>/*,        |
+             |   attendees, feedback,    |   |   venue-map/*,            |
+             |   recap, appSettings      |   |   recap/*                 |
+             +---------------------------+   +---------------------------+
+                                                     ^
+                                                     | public image reads
+                                                     | (pub-<hash>.r2.dev)
+                                                 Attendee browser
 
    Attendee browser  <------ OneSignal Web SDK ------> OneSignal push service
    Admin browser     ------  CSV upload (Google Sheet export) ------> Firestore attendees
@@ -203,7 +222,7 @@ Every screen renders inside the same shell: a fixed top header with the Gateway 
 
 **Sponsor Editor**
 - Header: logo + "Admin — Sponsors" + logout
-- Body: tier-grouped list with reorder handles within a tier; "Add sponsor" button. Modal captures name, tier, booth number, website, email, description, logo file (uploaded to Firebase Storage, URL stored on the sponsor document).
+- Body: tier-grouped list with reorder handles within a tier; "Add sponsor" button. Modal captures name, tier, booth number, website, email, description, logo file (uploaded via `/api/upload` to Cloudflare R2, public URL stored on the sponsor document).
 - Empty / Loading / Error: as agenda
 
 **Venue Map Uploader**
@@ -271,7 +290,7 @@ All documents live in Firestore in a single project. Collections are flat and do
   website:     string (optional, URL)
   email:       string (optional, email)
   boothNumber: string (optional, free-text so "A3" is valid)
-  logoUrl:     string (optional, Firebase Storage URL)
+  logoUrl:     string (optional, Cloudflare R2 public URL — key `sponsors/<id>/<timestamp>.<ext>`)
   order:       number (within-tier sort)
   updatedAt:   string
   updatedBy:   string
@@ -344,7 +363,7 @@ Note: no email, phone, or SCTE member number is stored client-readable in Firest
   thanksMessage:string (optional, 0-2000)
   acknowledgments: string (optional, 0-2000, markdown allowed)
   photos: [
-    { id: string, url: string, caption: string, order: number }
+    { id: string, url: string (Cloudflare R2 public URL — key `recap/<id>.<ext>`), caption: string, order: number }
   ]
   updatedAt: string
   updatedBy: string
@@ -358,7 +377,7 @@ Note: no email, phone, or SCTE member number is stored client-readable in Firest
   eventDate:   string | null (ISO 8601 date, no time — placeholder until confirmed)
   venueName:    string (default "Doubletree Chesterfield")
   venueAddress: string (default "Chesterfield, MO 63005")
-  venueMapUrl:  string | null (Firebase Storage URL for the uploaded map)
+  venueMapUrl:  string | null (Cloudflare R2 public URL for the uploaded map — key `venue-map/<timestamp>.<ext>`)
   venueMapCaption: string
   updatedAt:    string
   updatedBy:    string
@@ -467,7 +486,8 @@ Per the resolved decision and Requirement 2.1, the push opt-in is not shown duri
 ├── functions/           # Cloudflare Pages Functions source
 │   ├── admin-login.js
 │   ├── firestore-write.js
-│   └── send-push.js
+│   ├── send-push.js
+│   └── upload.js        # multipart upload broker → Cloudflare R2
 ├── scripts/
 │   └── build-sw.js      # 30-line Node script to stamp sw.js
 ├── docs/
@@ -496,9 +516,14 @@ Production and Preview scopes:
 - `ONESIGNAL_REST_API_KEY` — **secret**, server-only
 - `ADMIN_PASSPHRASE_HASH` — **secret**, server-only
 - `ADMIN_JWT_SECRET` — **secret**, server-only
-- `FIREBASE_SERVICE_ACCOUNT_JSON` — **secret**, server-only (full service account JSON pasted as a single-line string)
+- `FIREBASE_SERVICE_ACCOUNT_JSON` — **secret**, server-only (full service account JSON pasted as a single-line string; used by `/api/firestore-write` for Firestore REST calls)
 - `FIREBASE_PROJECT_ID` — public
 - `FIREBASE_WEB_API_KEY` — public (used for read-only Firestore client auth; locked down by security rules)
+- `R2_PUBLIC_URL` — public (plain-text), the `https://pub-<hash>.r2.dev` hostname Cloudflare assigns to the `vendor-day-2027-assets` R2 bucket. Also returned to the client via `/api/config.assetsBaseUrl`.
+
+### R2 bindings (Cloudflare Pages → Settings → Functions → R2 bucket bindings)
+Not environment variables — bindings. Production and Preview scopes:
+- `ASSETS_BUCKET` → `vendor-day-2027-assets`. The upload Function reads `env.ASSETS_BUCKET.put(key, body, opts)`.
 
 ## 11. Accessibility Plan
 
@@ -593,7 +618,8 @@ These are provisioning tasks, not design decisions. Implementer should raise the
 
 - **Admin passphrase value.** The actual passphrase to be chosen by the Gateway Chapter board. The implementer runs the hashing script locally with the chosen passphrase and installs the resulting `ADMIN_PASSPHRASE_HASH` in Cloudflare Pages.
 - **OneSignal account setup.** The user (or whoever owns the chapter's accounts) creates a OneSignal account, creates a Web Push app for `2027vendorday.gatewayscte.org`, and provides the `ONESIGNAL_APP_ID` and `ONESIGNAL_REST_API_KEY` for the Cloudflare Pages environment.
-- **Firebase project.** A new Firebase project needs to be created for Vendor Day 2027. Implementer needs the project ID, Web API key, and a downloaded service-account JSON for Pages Functions.
+- **Firebase project.** A new Firebase project needs to be created for Vendor Day 2027. Implementer needs the project ID, Web API key, and a downloaded service-account JSON for Pages Functions. (Firestore only — Firebase Storage is not used; see the R2 bucket task below.)
+- **Cloudflare R2 bucket.** Create an R2 bucket named `vendor-day-2027-assets`, enable public access, and note the `https://pub-<hash>.r2.dev` URL Cloudflare assigns. In the Pages project, add the R2 bucket binding `ASSETS_BUCKET` → `vendor-day-2027-assets` and set the env var `R2_PUBLIC_URL` to the public URL from the previous step (Production + Preview scopes).
 - **GoDaddy DNS access.** The CNAME for `2027vendorday` at the `gatewayscte.org` zone has already been added (per the user's earlier confirmation). Implementer verifies propagation and that Cloudflare has issued the certificate.
 - **Chapter logo asset.** The implementer needs the Gateway Chapter mark as an SVG (color + monochrome variants) to use in the header, manifest icons, and placeholder states. If only a raster logo exists, implementer requests PNG at 1024px square.
 - **Registration Google Sheet URL (for admin reference only).** The admins export CSV from this sheet. The URL is not stored in the app; it is documented in `docs/admin-runbook.md` so admins can bookmark it.

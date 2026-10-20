@@ -3,12 +3,15 @@
 This runbook captures the one-time and recurring steps to deploy the Vendor Day
 2027 PWA. Sections are added as the matching implementation task lands.
 
-## Firebase (Firestore + Storage + initial seed)
+## Firebase (Firestore + initial seed)
 
 The app's content lives in Firebase project **`scte-vendorday-2027`** (Firestore
-in native mode, plus Firebase Storage for uploaded sponsor logos, venue map
-images, and recap photos). This section covers deploying the security rules in
-`firestore.rules` and `storage.rules` and seeding the `appSettings/singleton`
+in native mode). Uploaded sponsor logos, the venue map image, and recap photos
+live in **Cloudflare R2** (bucket `vendor-day-2027-assets`) rather than Firebase
+Storage — the Firebase policy change in 2026 requires the Blaze pay-as-you-go
+plan for Storage, which breaks our free-tier posture. See the Cloudflare R2
+section below for provisioning. This section covers deploying the Firestore
+security rules in `firestore.rules` and seeding the `appSettings/singleton`
 document so the attendee app's first read succeeds.
 
 Run these steps from a Windows laptop with PowerShell. All commands assume the
@@ -62,21 +65,14 @@ This confirms the alias defined in `.firebaserc` and prints the active project.
 If the output does not read `Now using project scte-vendorday-2027`, stop and
 re-check the file.
 
-### 4. (One-time) Enable Firebase Storage
-
-Firestore is already enabled in native mode. Firebase Storage may still be
-unprovisioned. If step 5 fails with a message mentioning Storage not being
-set up, open **Firebase Console → Build → Storage → Get started**, choose
-**Production mode**, and pick the **us-central** location. Then retry step 5.
-
-### 5. Deploy the Firestore and Storage rules
+### 4. Deploy the Firestore rules
 
 ```powershell
-firebase deploy --only firestore:rules,storage:rules
+firebase deploy --only firestore:rules
 ```
 
-A successful deploy prints `Deploy complete!` and lists the two rules sources
-by file name. The posture after deploy:
+A successful deploy prints `Deploy complete!` and lists the Firestore rules
+source by file name. The posture after deploy:
 
 - `agenda`, `sponsors`, `announcements`, `feedbackConfig`, `recap`, and
   `appSettings` are publicly readable; client writes are denied.
@@ -84,11 +80,11 @@ by file name. The posture after deploy:
   includes the matching `where` filter).
 - `feedbackResponses` accept client `create` only (no read, update, or
   delete).
-- Firebase Storage paths `/sponsors/**`, `/venue-map/**`, and `/recap/**` are
-  publicly readable; all client writes are denied. Admin uploads flow through
-  `/api/upload` (added in a later task) with the Admin SDK.
+- User-uploaded images (sponsor logos, venue map, recap photos) are served
+  from a public Cloudflare R2 bucket. Admin uploads flow through
+  `/api/upload`, which writes to the bound R2 namespace with the admin JWT.
 
-### 6. Seed the `appSettings/singleton` document
+### 5. Seed the `appSettings/singleton` document
 
 The seed script is written in plain Node and uses the Firebase Admin SDK,
 which lives in `devDependencies`. Install dev deps once:
@@ -114,7 +110,7 @@ node scripts/seed-app-settings.js
 On success the script prints a single confirmation line like
 `Seeded appSettings/singleton for project: scte-vendorday-2027`.
 
-### 7. Verify
+### 6. Verify
 
 Anonymous read of the seeded document (public read is allowed):
 
@@ -137,14 +133,14 @@ curl.exe -X PATCH `
 
 Expect a `403` with a message containing `Missing or insufficient permissions`
 or `PERMISSION_DENIED`. If this write succeeds, stop and re-check the rules
-deploy in step 5.
+deploy in step 4.
 
 ### Re-deploying after a rules edit
 
-Any time `firestore.rules` or `storage.rules` changes:
+Any time `firestore.rules` changes:
 
 ```powershell
-firebase deploy --only firestore:rules,storage:rules
+firebase deploy --only firestore:rules
 ```
 
 The seed script only needs to run once (and again after any schema change in
@@ -157,8 +153,10 @@ structure, with the `api/` subdirectory serving as the API prefix. The server
 code in this repo lives at `functions/api/*.js`:
 
 - `functions/api/admin-login.js` → `/api/admin-login`
+- `functions/api/config.js` → `/api/config`
 - `functions/api/firestore-write.js` → `/api/firestore-write`
 - `functions/api/send-push.js` → `/api/send-push`
+- `functions/api/upload.js` → `/api/upload`
 
 The design doc (section 10) sketches these as `functions/admin-login.js` etc.
 The code uses the `api/` subdirectory because Cloudflare's routing requires it
@@ -168,10 +166,10 @@ routes.
 
 ## Cloudflare Pages
 
-The static site plus the three Pages Functions in `functions/api/` ship from
-one Cloudflare Pages project connected to the GitHub repo. There is no
-separate publish step for Functions — every push to `main` rebuilds the site
-and redeploys the Functions atomically. Feature branches get isolated preview
+The static site plus the Pages Functions in `functions/api/` ship from one
+Cloudflare Pages project connected to the GitHub repo. There is no separate
+publish step for Functions — every push to `main` rebuilds the site and
+redeploys the Functions atomically. Feature branches get isolated preview
 deployments at `<branch>.<project>.pages.dev`.
 
 ### 1. Create the Pages project
@@ -219,6 +217,11 @@ provisioned by Task 1 and listed in `docs/provisioning-checklist.md`.
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Prod + Preview | **Encrypt** | Firebase Console → Service accounts → Generate key, paste the full JSON as one line |
 | `FIREBASE_PROJECT_ID`           | Prod + Preview | Plaintext | `scte-vendorday-2027`                            |
 | `FIREBASE_WEB_API_KEY`          | Prod + Preview | Plaintext | Firebase Console → Project settings → General   |
+| `R2_PUBLIC_URL`                 | Prod + Preview | Plaintext | The `https://pub-<hash>.r2.dev` URL Cloudflare assigns to the `vendor-day-2027-assets` bucket when public access is enabled (see "Cloudflare R2" below). Also returned to the browser via `/api/config.assetsBaseUrl`. |
+
+The `ASSETS_BUCKET` R2 binding is also required by `/api/upload`, but it is
+configured under **Settings → Functions → R2 bucket bindings** rather than
+Environment variables. See the "Cloudflare R2 (asset storage)" section below.
 
 Every row marked **Encrypt** must use Cloudflare's encrypted secret toggle so
 the value is never visible after save. Rotation is a two-step process:
@@ -242,7 +245,14 @@ live.
 3. Save and trigger a redeploy (Pages applies new bindings on the next
    deploy; a trivial empty commit works, or push a branch and merge).
 
-### 5. Verify (smoke tests)
+### 5. Create and bind the R2 bucket for user-uploaded assets
+
+See the dedicated **Cloudflare R2 (asset storage)** section further down.
+That section walks through creating the `vendor-day-2027-assets` bucket,
+enabling public access, setting `R2_PUBLIC_URL`, and binding
+`ASSETS_BUCKET` to the Pages project.
+
+### 6. Verify (smoke tests)
 
 Run these from a terminal after the first production deploy. Replace
 `<domain>` with `2027vendorday.gatewayscte.org` for production or
@@ -283,6 +293,9 @@ curl.exe -i -X POST "https://<domain>/api/send-push" `
   -H "Content-Type: application/json" `
   --data "{ `"announcementId`": `"a`", `"title`": `"t`", `"bodyPreview`": `"b`" }"
 
+# Upload: no Authorization → 401
+curl.exe -i --ssl-no-revoke -X POST "https://<domain>/api/upload"
+
 # Healthcheck (admin-authenticated). Replace <jwt> with a token returned by a
 # successful /api/admin-login call.
 curl.exe -i "https://<domain>/api/send-push?healthcheck=1" `
@@ -297,20 +310,100 @@ Expected results:
   `{"error":"Too many attempts","retryAfterSec":600}`.
 - Both firestore-write smoke calls return `401 Unauthorized`.
 - The send-push smoke call returns `401 Unauthorized`.
+- The upload smoke call returns `401 Unauthorized`.
 - The healthcheck returns `200` with `{"firestore":"ok","onesignal":"ok"}`
   when all three services are reachable. If either reads `"fail"`, inspect the
   Pages function logs for the detail.
 
-### 6. Function deployment model
+### 7. Function deployment model
 
 Function source lives in `functions/api/*.js` and `functions/_shared/*.js`.
 Cloudflare Pages picks them up on every deploy; there is **no separate
 `wrangler publish`** step. A `git push` to `main` is the sole deploy signal
-for both the static assets in `public/` and the three Functions endpoints.
+for both the static assets in `public/` and the Functions endpoints.
 
 If `jose` ever fails to run on the Workers runtime (not expected — `jose` is
 built for the Web Crypto / Workers environment), the fallback is to add a
 `wrangler.toml` at the repo root with `compatibility_flags = ["nodejs_compat"]`
 and `compatibility_date = "2024-09-23"` and swap in `firebase-admin` on the
 server side. Document that fallback here if it is ever used.
+
+## Cloudflare R2 (asset storage)
+
+User-uploaded assets (sponsor logos, the venue map image, recap photos) live
+in a Cloudflare R2 bucket named `vendor-day-2027-assets`. R2's free tier
+(10 GB storage, 1 M writes/month, 10 M reads/month, zero egress) covers an
+event of a few hundred attendees comfortably, and the `/api/upload` Pages
+Function writes to the bucket via the Pages-bound `env.ASSETS_BUCKET`
+namespace. Public reads come straight from the bucket's assigned
+`https://pub-<hash>.r2.dev` hostname (safe for sponsor logos, the venue map,
+and recap photos — all public by design).
+
+### 1. Create the bucket
+
+1. Cloudflare dashboard → **R2** (left sidebar). If this is the first time
+   using R2 on the account, agree to the R2 terms when prompted. (R2 does
+   not require a paid plan for free-tier usage, but Cloudflare requires a
+   credit card on file as a prerequisite.)
+2. **Create bucket** → name `vendor-day-2027-assets` → Location
+   **Automatic** → **Create bucket**.
+
+### 2. Enable public access
+
+1. Open the bucket → **Settings** tab → **Public access** section.
+2. Toggle **Allow public access** on and confirm the warning. This exposes
+   every object in the bucket under a `https://pub-<hash>.r2.dev/...` URL —
+   acceptable here because all three asset classes (sponsor logos, venue
+   map, recap photos) are already meant to be public.
+3. Copy the **Public URL** shown on the Settings page. It looks like
+   `https://pub-abc123def456.r2.dev` (no trailing slash).
+
+### 3. Install the `R2_PUBLIC_URL` env var
+
+In Cloudflare Pages → **Settings → Environment variables** → **Add
+variable**:
+
+- Variable name: `R2_PUBLIC_URL`
+- Type: **Plaintext**
+- Value: the Public URL copied in step 2 (for example
+  `https://pub-abc123def456.r2.dev`)
+- Scopes: **Production** and **Preview**
+
+Save.
+
+### 4. Bind `ASSETS_BUCKET` to the Pages project
+
+The upload Function reads `env.ASSETS_BUCKET`, which is an R2 binding (not
+an env var). Pages exposes bindings separately from environment variables.
+
+1. In the Pages project → **Settings → Bindings** (or **Settings →
+   Functions → R2 bucket bindings** on older dashboards) → **Add binding**.
+2. Variable name: **`ASSETS_BUCKET`** (exact casing — the function code
+   reads `env.ASSETS_BUCKET`).
+3. R2 bucket: `vendor-day-2027-assets`.
+4. Save.
+
+### 5. Retry the latest deploy
+
+Env vars and bindings only apply to Functions on the next build. In
+**Deployments → latest → ⋯ → Retry deployment** so the running Function
+picks up `R2_PUBLIC_URL` and the `ASSETS_BUCKET` binding without waiting for
+the next commit.
+
+### 6. Smoke test
+
+Replace `<domain>` with the Pages hostname (production or preview):
+
+```powershell
+# Should return 401 without a JWT
+curl.exe -i --ssl-no-revoke -X POST "https://<domain>/api/upload"
+```
+
+Expected: HTTP `401` with `{"error":"Unauthorized"}`. The handler validates
+the admin JWT before it reads the multipart body, so this confirms the
+Function is deployed and wired without needing a real file upload.
+
+An end-to-end upload is verified from the admin editors in Tasks 19, 20,
+and 24 — on save, the sponsor / map / recap view renders the image from the
+`pub-<hash>.r2.dev` URL.
 
