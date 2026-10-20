@@ -1384,3 +1384,221 @@ a:focus-visible {
     transition: none;
   }
 }
+
+/* ---------- Announcements view (Task 12) ---------- */
+
+/* List container is a plain block so each card controls its own spacing. */
+.announcements-list {
+  display: block;
+}
+
+/* Opt-in / denied slots sit directly below the sticky header so the user
+   sees them before scrolling into the feed. The slots are empty blocks
+   when there is nothing to render, which keeps the layout stable. */
+.announcements-opt-in-slot:empty,
+.announcements-denied-slot:empty {
+  display: none;
+}
+
+/* --- Push opt-in card --- */
+
+/* Standard variant uses the shared `.card` chrome vocabulary (border,
+   radius, padding) tuned a touch tighter so it reads as an inline prompt
+   above the feed rather than a document section. */
+.push-opt-in-card {
+  border: 1px solid var(--brand-green);
+  background: #EEF8F2;
+  border-radius: var(--radius);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+
+.push-opt-in-card__title {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+
+.push-opt-in-card__body {
+  margin: 0 0 var(--space-md);
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+
+.push-opt-in-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+.push-opt-in-card__actions .btn-primary,
+.push-opt-in-card__actions .btn-secondary {
+  flex: 1 1 auto;
+  min-width: 10rem;
+}
+
+/* iOS variant: slightly different accent so the different intent (routes
+   to install docs instead of prompting) reads at a glance. */
+.push-opt-in-card--ios {
+  border-color: var(--border-neutral);
+  background: var(--surface-alt);
+}
+
+/* --- Denied banner --- */
+
+/* Subdued, non-intrusive strip. Lives below the sticky header on every
+   visit while permission is denied; users can't be re-prompted so the
+   wording directs them to the OS settings instead. */
+.push-denied-banner {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  margin-bottom: var(--space-md);
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* --- Announcement card --- */
+
+.announcement-card {
+  position: relative;
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: var(--space-md);
+  margin-bottom: var(--space-md);
+  /* Pre-set the ring color + transform so the highlight transition has
+     a stable baseline on cards without the highlighted class. */
+  box-shadow: 0 0 0 0 var(--brand-green);
+  transform: scale(1);
+  transition: box-shadow 220ms ease-out, transform 220ms ease-out;
+}
+
+.announcement-card__header {
+  margin-bottom: var(--space-sm);
+}
+
+.announcement-card__title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.announcement-card__unread-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--brand-green);
+  flex: 0 0 auto;
+}
+
+.announcement-card__byline {
+  font-weight: 600;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+}
+
+.announcement-card__time {
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+}
+
+.announcement-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: baseline;
+}
+
+/* Markdown body sub-selectors — markdown-mini renders paragraphs, bold,
+   italic, inline code, links, and lists. Scoping to the card lets us
+   use plain element selectors without leaking into the rest of the view. */
+.announcement-card__body {
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.announcement-card__body p {
+  margin: 0 0 var(--space-sm);
+}
+.announcement-card__body p:last-child {
+  margin-bottom: 0;
+}
+.announcement-card__body strong {
+  font-weight: 700;
+}
+.announcement-card__body em {
+  font-style: italic;
+}
+.announcement-card__body ul,
+.announcement-card__body ol {
+  margin: 0 0 var(--space-sm) var(--space-lg);
+  padding: 0;
+}
+.announcement-card__body li {
+  margin: 0 0 var(--space-xs);
+  line-height: var(--line-height-md);
+}
+.announcement-card__body a {
+  color: var(--brand-green-text);
+  text-decoration: underline;
+}
+.announcement-card__body a:hover,
+.announcement-card__body a:focus-visible {
+  color: var(--brand-green);
+}
+.announcement-card__body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  padding: 0 4px;
+}
+
+/* Highlight animation when the view opens via #/announcements/<id>.
+   A brand-green ring + a subtle scale call attention to the target card
+   for ~2 seconds. prefers-reduced-motion suppresses the scale and uses
+   only the ring. */
+.announcement-highlighted {
+  box-shadow: 0 0 0 3px var(--brand-green);
+  transform: scale(1.015);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .announcement-card {
+    transition: none;
+  }
+  .announcement-highlighted {
+    transform: none;
+  }
+}
+
+/* Error strip inside the feed when a poll failed but we still have
+   cached content to show beneath it. Mirrors Agenda/Sponsors/Map. */
+.announcements-error-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.announcements-error-strip .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* Skeleton card: the shared `.skeleton-row` shimmer powers the inner
+   rows; the outer `.announcement-card` chrome keeps the footprint close
+   to the real card so the list doesn't jump on first paint. */
+.skeleton-announcement {
+  box-shadow: none;
+}
