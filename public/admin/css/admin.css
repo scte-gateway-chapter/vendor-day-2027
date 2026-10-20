@@ -89,3 +89,109 @@
     color: var(--brand-green-text);
   }
 }
+
+/* ---------- Admin Login (Task 16) ---------- */
+
+/* Centered card so the login reads as a focused action rather than a page.
+   Reuses the shared palette tokens from app.css. */
+.admin-login-container {
+  margin: var(--space-xl) auto;
+  max-width: 24rem;
+  padding: var(--space-lg);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-login-banner {
+  padding: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-md);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+
+.admin-login-title {
+  margin: 0 0 var(--space-md);
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* .form-field already supplies the label + input layout; this strips the
+   bottom-margin override the login card doesn't need (the form itself
+   gaps rows). */
+.admin-login-form .form-field {
+  margin-bottom: 0;
+}
+
+.admin-login-input {
+  width: 100%;
+}
+
+/* .admin-login-submit layers on top of .btn-primary from app.css. The
+   loading modifier paints a small CSS-only spinner in the trailing edge
+   so there's no extra DOM to add. */
+.admin-login-submit {
+  width: 100%;
+  position: relative;
+}
+.admin-login-submit--loading::after {
+  content: "";
+  position: absolute;
+  right: var(--space-md);
+  top: 50%;
+  margin-top: -0.5rem;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #FFF;
+  border-radius: 50%;
+  animation: admin-login-spin 0.8s linear infinite;
+}
+@keyframes admin-login-spin {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-login-submit--loading::after { animation: none; }
+}
+
+/* .admin-login-error wraps .status-error from app.css; override only the
+   margin so it sits snug under the submit button. */
+.admin-login-error {
+  margin: 0;
+}
+
+.admin-login-countdown {
+  margin: 0;
+  color: var(--muted-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* Unauthenticated shell: hide the left-rail nav, the phone-width nav
+   dropdown, and the header logout button. Toggled by admin.js on the
+   <body> element. */
+body.admin-shell--unauthenticated .admin-rail,
+body.admin-shell--unauthenticated .admin-nav-select__label,
+body.admin-shell--unauthenticated .admin-header__logout {
+  display: none;
+}
+
+/* At tablet+ widths .admin-layout is a 14rem / 1fr grid; when the nav is
+   hidden we collapse to a single column so the login card centers. */
+@media (min-width: 48rem) {
+  body.admin-shell--unauthenticated .admin-layout {
+    grid-template-columns: 1fr;
+  }
+}
