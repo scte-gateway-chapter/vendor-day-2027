@@ -13,6 +13,12 @@
 import * as router from "./router.js";
 import * as ui from "./ui.js";
 import { initFirestore, getDoc } from "./firebase.js";
+import { renderWelcome } from "./views/welcome.js";
+
+/** Persistent flag — once the user taps "I'll do this later" we skip Welcome
+ *  for every subsequent visit on this device. Cleared only by the user via
+ *  site-data clear or private-mode. */
+const WELCOME_DISMISS_KEY = "vendorday2027.welcome.dismissed";
 
 /** Shared handle so views can `await` the one-time /api/config load. */
 let firestoreReady = null;
@@ -58,6 +64,51 @@ function placeholderView(sectionName, taskLabel) {
       root.append(section);
       document.title = `${sectionName} \u2014 Vendor Day 2027`;
     });
+}
+
+/* ----------------- Welcome / Install (Task 7) ----------------- */
+
+/**
+ * `#/` handler. Three outcomes:
+ *   1. localStorage dismiss flag is set  → navigate to #/home.
+ *   2. The app is already installed (standalone)  → navigate to #/home.
+ *   3. Otherwise, render the Welcome view and give it an `onDismiss`
+ *      callback that writes the flag and routes to #/home.
+ */
+async function renderWelcomeRoute() {
+  if (readWelcomeDismissed() || isStandaloneLaunch()) {
+    router.navigate("/home");
+    return;
+  }
+  await ui.showView(async (root) => {
+    await renderWelcome(root, {
+      onDismiss: () => {
+        try {
+          localStorage.setItem(WELCOME_DISMISS_KEY, "true");
+        } catch (err) {
+          // Private-mode Safari / blocked storage: non-fatal, the user will
+          // just see Welcome again next time. Nothing else to do.
+          console.warn("[app] welcome dismiss flag write failed:", err);
+        }
+        router.navigate("/home");
+      },
+    });
+  });
+}
+
+function readWelcomeDismissed() {
+  try {
+    return localStorage.getItem(WELCOME_DISMISS_KEY) === "true";
+  } catch (err) {
+    return false;
+  }
+}
+
+function isStandaloneLaunch() {
+  return (
+    window.matchMedia?.("(display-mode: standalone)")?.matches === true ||
+    window.navigator.standalone === true
+  );
 }
 
 /* ----------------- About & Install (the one real view in Task 6) ----------------- */
@@ -219,8 +270,9 @@ async function main() {
   wireOnlineOffline();
 
   // Register placeholder routes for every area called out in Task 6. Views
-  // land in later tasks (Welcome in 7, Home in 8, etc).
-  router.register("#/", placeholderView("Home", "Task 8"));
+  // land in later tasks (Home in 8, etc). Welcome is the first real view
+  // and owns `#/`.
+  router.register("#/", renderWelcomeRoute);
   router.register("#/home", placeholderView("Home", "Task 8"));
   router.register("#/agenda", placeholderView("Agenda", "Task 9"));
   router.register("#/agenda/<id>", placeholderView("Agenda", "Task 9"));

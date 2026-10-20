@@ -528,6 +528,82 @@ a:focus-visible {
   .skeleton-card { animation: none; }
 }
 
+/* ---------- Welcome / Install view (Task 7) ---------- */
+
+/* Hero: chapter logo on the left, event title + venue on the right. On
+   narrow viewports we stack logo above text so neither clips. */
+.welcome-hero {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.welcome-hero__logo {
+  display: block;
+  width: 72px;
+  height: auto;
+  flex: 0 0 auto;
+}
+.welcome-hero__text { flex: 1 1 auto; min-width: 0; }
+.welcome-hero__title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+.welcome-hero__venue {
+  margin: 0;
+  color: var(--secondary-text);
+  line-height: var(--line-height-md);
+}
+
+@media (max-width: 24rem) {
+  .welcome-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm);
+  }
+}
+
+/* Install card: shared `.card` chrome plus a muted help line. */
+.welcome-install-card .welcome-install-button {
+  margin-top: var(--space-sm);
+}
+.welcome-install-card .welcome-note {
+  margin-top: var(--space-sm);
+  margin-bottom: 0;
+  color: var(--muted-text);
+  font-size: var(--font-size-sm);
+}
+
+.install-steps-svg {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: var(--space-md) 0 var(--space-sm);
+}
+
+.welcome-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: 0 var(--space-xs);
+}
+.welcome-later-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: var(--space-xs) 0;
+  font-weight: 600;
+}
+.welcome-help {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+
 /* ---------- Simple link list used by the 404 and About views ---------- */
 
 .inline-link-list {
