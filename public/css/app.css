@@ -762,7 +762,8 @@ a:focus-visible {
 /* Secondary sticky header below the main app header. Positions right at
    the bottom edge of #app-header so it reads as a sub-section banner and
    stays put while the list scrolls under it. */
-.agenda-sticky-header {
+.agenda-sticky-header,
+.view-sticky-header {
   position: sticky;
   top: var(--header-height);
   z-index: 5;
@@ -774,7 +775,8 @@ a:focus-visible {
   background: var(--surface);
   border-bottom: 1px solid var(--border-neutral);
 }
-.agenda-sticky-header__title {
+.agenda-sticky-header__title,
+.view-sticky-header__title {
   margin: 0;
   font-size: var(--font-size-lg);
   font-weight: 600;
@@ -786,9 +788,12 @@ a:focus-visible {
   font-weight: 400;
 }
 
-/* Back button in the detail view's sticky header. 44x44 touch target with
-   a visible glyph; the "Back" label is sr-only per spec. */
-.agenda-back {
+/* Back button in a detail view's sticky header. 44x44 touch target with
+   a visible glyph; the "Back" label is sr-only per spec. `.agenda-back`
+   is kept as the Agenda-view class name; `.view-back-button` is the
+   shared alias used by newer views (Sponsors, etc.). */
+.agenda-back,
+.view-back-button {
   min-width: 44px;
   min-height: 44px;
   display: inline-flex;
@@ -801,7 +806,9 @@ a:focus-visible {
   flex: 0 0 auto;
 }
 .agenda-back:hover,
-.agenda-back:focus-visible {
+.agenda-back:focus-visible,
+.view-back-button:hover,
+.view-back-button:focus-visible {
   background: var(--surface-alt);
 }
 
@@ -985,3 +992,262 @@ a:focus-visible {
   padding: 0;
 }
 .inline-link-list li { margin: var(--space-xs) 0; }
+
+/* ---------- Sponsor Directory views (Task 10) ---------- */
+
+/* List container is a plain block; each tier group inside carries its own
+   bottom margin so the list breathes between tiers. */
+.sponsors-list {
+  display: block;
+}
+
+.sponsor-tier-group {
+  margin-bottom: var(--space-lg);
+}
+
+.sponsor-tier-label {
+  margin: 0 0 var(--space-sm);
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--secondary-text);
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: var(--line-height-md);
+}
+
+/* Sponsor row is an anchor so right/middle-click opens naturally. Flex
+   layout keeps the 64x64 logo on the leading edge, the chevron on the
+   trailing edge, and lets the name/booth block grow between them. */
+.sponsor-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--body-text);
+  text-decoration: none;
+  margin-bottom: var(--space-sm);
+  min-height: 44px;
+}
+.sponsor-card:hover,
+.sponsor-card:focus-visible {
+  background: var(--surface-alt);
+  color: var(--body-text);
+}
+
+.sponsor-logo {
+  display: block;
+  width: 64px;
+  height: 64px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+}
+
+.sponsor-card__body {
+  flex: 1 1 auto;
+  min-width: 0; /* allows the name to clamp on narrow viewports */
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.sponsor-name {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+
+.sponsor-meta {
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.sponsor-chevron {
+  flex: 0 0 auto;
+  color: var(--secondary-text);
+  font-size: 1.5rem;
+  line-height: 1;
+  padding-left: var(--space-sm);
+}
+
+/* Loading skeleton: thinner rows plus a short label block above each
+   simulated tier group. Uses the shared `.skeleton-row` shimmer. */
+.sponsor-tier-label-skeleton {
+  margin-bottom: var(--space-sm);
+}
+.sponsor-row-skeleton {
+  margin-bottom: var(--space-sm);
+}
+
+/* Error strip inside the list when a poll failed but we still have cached
+   content to show beneath it. Mirrors the Agenda pattern. */
+.sponsors-error-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.sponsors-error-strip .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* ---------- Sponsor detail view ---------- */
+
+.sponsor-detail {
+  display: block;
+}
+
+.sponsor-detail-section {
+  margin-bottom: var(--space-lg);
+}
+.sponsor-detail-section:last-child { margin-bottom: 0; }
+
+/* Head: large logo + tier chip + h1. Stacks on narrow viewports, side-by-
+   side at >= 28rem so the chip and title have room to breathe. */
+.sponsor-detail-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-md);
+}
+@media (min-width: 28rem) {
+  .sponsor-detail-head {
+    flex-direction: row;
+    align-items: center;
+  }
+}
+
+.sponsor-detail-logo {
+  display: block;
+  width: 128px;
+  height: 128px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+}
+
+.sponsor-detail-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.sponsor-detail-title {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-xl);
+}
+
+.sponsor-detail-description {
+  margin: 0;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+  white-space: pre-wrap;
+}
+
+.sponsor-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.sponsor-detail-line {
+  margin: 0;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.sponsor-detail-booth {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+.sponsor-find-on-map {
+  font-weight: 600;
+}
+
+/* Website link: button-style chip with a trailing external-link glyph.
+   The glyph is aria-hidden; the anchor's aria-label calls out the new
+   tab behavior for screen readers. */
+.sponsor-website-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  min-height: 44px;
+  padding: var(--space-xs) 0;
+  font-weight: 600;
+  text-decoration: underline;
+}
+.sponsor-external-icon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* Tier chip: text-labeled (not color-only) so WCAG 1.4.1 is satisfied.
+   Platinum is the solid brand-green treatment; the rest use outlined
+   variants that step down in weight. */
+.sponsor-tier-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 12px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  border: 1px solid transparent;
+  background: var(--surface);
+  color: var(--body-text);
+}
+.sponsor-tier-chip--platinum {
+  background: var(--brand-green);
+  color: #FFF;
+  border-color: var(--brand-green);
+}
+.sponsor-tier-chip--gold {
+  background: var(--surface);
+  color: var(--brand-green-text);
+  border-color: var(--brand-green);
+}
+.sponsor-tier-chip--silver {
+  background: var(--surface);
+  color: var(--secondary-text);
+  border-color: var(--secondary-text);
+}
+.sponsor-tier-chip--supporter {
+  background: var(--surface);
+  color: var(--muted-text);
+  border-color: var(--border-neutral);
+}
+
+/* Loading skeleton for the detail head: a 128x128 logo square beside two
+   text rows. The shared `.skeleton-row` shimmer powers both. */
+.sponsor-detail-skeleton-head {
+  display: flex;
+  gap: var(--space-md);
+  align-items: center;
+}
+.sponsor-detail-skeleton-logo {
+  width: 128px;
+  height: 128px;
+  flex: 0 0 auto;
+  margin: 0;
+}
+.sponsor-detail-skeleton-head-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
