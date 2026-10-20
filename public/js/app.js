@@ -12,7 +12,7 @@
 
 import * as router from "./router.js";
 import * as ui from "./ui.js";
-import { initFirestore, getDoc } from "./firebase.js";
+import { initFirestore, getDoc, onSnapshot } from "./firebase.js";
 import { renderWelcome } from "./views/welcome.js";
 import { renderHome } from "./views/home.js";
 import { renderAgenda } from "./views/agenda.js";
@@ -24,6 +24,7 @@ import { renderAnnouncements } from "./views/announcements.js";
 import { renderAttendees } from "./views/attendees.js";
 import { renderAttendeeDetail } from "./views/attendees-detail.js";
 import { renderFeedback } from "./views/feedback.js";
+import { renderRecap } from "./views/recap.js";
 
 /** Persistent flag — once the user taps "I'll do this later" we skip Welcome
  *  for every subsequent visit on this device. Cleared only by the user via
@@ -334,7 +335,7 @@ async function main() {
     ui.showView((root) => renderAttendeeDetail(root, { id: params.id })),
   );
   router.register("#/feedback", () => ui.showView((root) => renderFeedback(root)));
-  router.register("#/recap", placeholderView("Recap", "Task 15"));
+  router.register("#/recap", () => ui.showView((root) => renderRecap(root)));
   router.register("#/about-install", renderAboutInstall);
   router.register("*", render404);
 
@@ -361,7 +362,56 @@ async function main() {
     );
   });
 
+  // App-lifetime poll driving the More menu's Recap entry visibility.
+  // Runs for the whole session (not registered with view cleanup) so the
+  // menu reflects `recap.published` within ~60s of an admin flip even if
+  // the user never navigates to #/recap. The Recap view itself still runs
+  // its own 30s poll while it is mounted.
+  startRecapMenuPoll();
+
   router.start();
+}
+
+/* ----------------- App-lifetime recap-published poll ----------------- */
+
+/** Unsubscribe handle for the app-lifetime recap-published poll. Kept at
+ *  module scope so the beforeunload listener can clear it as a courtesy;
+ *  the browser would reclaim the timer on page unload anyway. */
+let __recapMenuUnsub = null;
+
+function startRecapMenuPoll() {
+  if (!firestoreReady) return;
+  firestoreReady
+    .then((config) => {
+      // If /api/config failed (`config` undefined), onSnapshot's first
+      // tick will throw inside firebase.js and the loop will retry on
+      // every interval. We skip starting the poll in that case so we
+      // don't flood the console with the same error every minute.
+      if (!config) return;
+      __recapMenuUnsub = onSnapshot(
+        "recap/singleton",
+        (data, err) => {
+          if (err) {
+            // Non-fatal: the Recap entry simply stays in its last-known
+            // state until the next tick succeeds. A log is enough here
+            // because the view-level poll surfaces the user-facing error
+            // when the user visits #/recap directly.
+            console.warn("[app] recap menu poll failed:", err);
+            return;
+          }
+          ui.setRecapMenuVisible(data?.published === true);
+        },
+        { intervalMs: 60000 },
+      );
+    })
+    .catch(() => { /* /api/config already surfaced its own toast above. */ });
+
+  window.addEventListener("beforeunload", () => {
+    if (__recapMenuUnsub) {
+      try { __recapMenuUnsub(); } catch (_err) { /* page is leaving anyway */ }
+      __recapMenuUnsub = null;
+    }
+  });
 }
 
 if (document.readyState === "loading") {

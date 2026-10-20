@@ -2146,3 +2146,197 @@ a:focus-visible {
   flex-direction: column;
   gap: var(--space-sm);
 }
+
+/* ---------- Recap view (Task 15) ---------- */
+
+/* Outer view container: plain block so each section controls its own
+   bottom margin. Max-width is inherited from `#view-root`'s reading
+   clamp; the photo gallery grid takes over width management inside. */
+.recap-view {
+  display: block;
+}
+
+/* Generic reading-paragraph block used by both the thanks message and
+   the acknowledgments section. The two sibling classes below layer
+   section-specific accents on top of this base. */
+.recap-section {
+  margin: 0 0 var(--space-lg);
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.recap-section:last-child {
+  margin-bottom: 0;
+}
+.recap-section p {
+  margin: 0 0 var(--space-sm);
+}
+.recap-section p:last-child {
+  margin-bottom: 0;
+}
+
+/* Thanks message reads as the hero paragraph of the recap — a touch
+   larger than the body copy so it carries the "thank-you from the
+   board" voice without needing a heading. */
+.recap-thanks p {
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-lg);
+  color: var(--body-text);
+}
+
+/* Markdown body sub-selectors scoped to the acknowledgments section.
+   Mirrors the vocabulary announcement cards use so markdown-rendered
+   content picks up the same paragraph, list, link, and code styling. */
+.recap-acknowledgments p {
+  margin: 0 0 var(--space-sm);
+}
+.recap-acknowledgments p:last-child {
+  margin-bottom: 0;
+}
+.recap-acknowledgments strong {
+  font-weight: 700;
+}
+.recap-acknowledgments em {
+  font-style: italic;
+}
+.recap-acknowledgments ul,
+.recap-acknowledgments ol {
+  margin: 0 0 var(--space-sm) var(--space-lg);
+  padding: 0;
+}
+.recap-acknowledgments li {
+  margin: 0 0 var(--space-xs);
+  line-height: var(--line-height-md);
+}
+.recap-acknowledgments a {
+  color: var(--brand-green-text);
+  text-decoration: underline;
+}
+.recap-acknowledgments a:hover,
+.recap-acknowledgments a:focus-visible {
+  color: var(--brand-green);
+}
+.recap-acknowledgments code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  padding: 0 4px;
+}
+
+/* Photo gallery: mobile-first CSS grid that auto-fills columns at the
+   220px lower bound. On narrow viewports this collapses to a single
+   column; on wider viewports (tablet / desktop) it opens into two or
+   three columns without any media queries. */
+.recap-photos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--space-md);
+  margin: 0 0 var(--space-lg);
+}
+
+.recap-photo {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+/* Images clamp to the column width while preserving aspect ratio.
+   Native lazy loading on the <img> element itself keeps off-screen
+   photos out of the initial fetch. */
+.recap-photo img {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.recap-photo figcaption {
+  padding: var(--space-xs) var(--space-sm) var(--space-sm);
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* Metadata footer: publishedAt + attribution. Reads as muted secondary
+   text so it closes the view without competing with the content above. */
+.recap-footer {
+  margin-top: var(--space-lg);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-neutral);
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.recap-footer__time {
+  display: block;
+}
+.recap-footer__attribution {
+  margin: 0;
+}
+
+/* Error strip inside the view when a poll failed but we still have
+   cached content to show beneath it. Mirrors the Agenda/Sponsors/Map/
+   Announcements pattern. */
+.recap-error-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.recap-error-strip .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* Loading skeleton: a text block followed by three photo frames in the
+   same grid layout the real gallery uses, so the first paint stays
+   close to the published footprint. */
+.skeleton-recap-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: 0 0 var(--space-lg);
+}
+
+.recap-photo-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-bg) 0%,
+    var(--skeleton-shimmer) 50%,
+    var(--skeleton-bg) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-lg);
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+  /* 4:3 aspect ratio so the skeleton frame reads as a photo rather than
+     an arbitrary rectangle. The gallery grid governs the width. */
+  aspect-ratio: 4 / 3;
+}
+@media (prefers-reduced-motion: reduce) {
+  .recap-photo-skeleton {
+    animation: none;
+  }
+}
+
+/* ---------- More menu — Recap entry ---------- */
+
+/* The entry's visibility is driven by the `hidden` attribute toggled
+   from app.js's recap-published poll. The native `hidden` attribute
+   already applies `display: none`, so there is no unconditional
+   `display: none` rule here — just a hook for later styling in case
+   the menu grows a separate "recap published" accent. */
+.more-menu__item--recap[hidden] {
+  display: none;
+}

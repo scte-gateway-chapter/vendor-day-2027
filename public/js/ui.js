@@ -15,6 +15,11 @@ const TAB_DEFS = [
 ];
 
 let adminSessionVisible = false;
+// Recap menu entry is hidden by default — the app-lifetime `recap/singleton`
+// poll in app.js flips this true when `published === true`. Direct URL
+// navigation to #/recap still works while the entry is hidden; the entry
+// is just a visibility affordance in the More menu.
+let recapMenuVisible = false;
 
 /* ---------------- Header ---------------- */
 
@@ -50,6 +55,7 @@ export function renderHeader() {
         role="menu"
         hidden
       >
+        <li role="none" class="more-menu__item--recap" data-recap-only hidden><a role="menuitem" href="#/recap">Recap</a></li>
         <li role="none"><a role="menuitem" href="#/about-install">About &amp; Install</a></li>
         <li role="none" data-admin-only hidden><a role="menuitem" href="/admin">Admin</a></li>
       </ul>
@@ -78,6 +84,7 @@ export function renderHeader() {
   menu.addEventListener("click", () => setOpen(false));
 
   applyAdminVisibility(mount);
+  applyRecapVisibility(mount);
 }
 
 /**
@@ -91,9 +98,28 @@ export function setAdminMenuVisible(visible) {
   if (mount) applyAdminVisibility(mount);
 }
 
+/**
+ * Show / hide the Recap menu entry. Called by the app-lifetime
+ * `recap/singleton` poll in app.js; exported here so other modules can
+ * flip it without reaching into the DOM. The entry is hidden by default
+ * (the module-level `recapMenuVisible` flag starts false) so the first
+ * poll tick that returns `published === true` is what flips it on.
+ * @param {boolean} visible
+ */
+export function setRecapMenuVisible(visible) {
+  recapMenuVisible = Boolean(visible);
+  const mount = document.getElementById("app-header");
+  if (mount) applyRecapVisibility(mount);
+}
+
 function applyAdminVisibility(mount) {
   const entry = mount.querySelector("[data-admin-only]");
   if (entry) entry.hidden = !adminSessionVisible;
+}
+
+function applyRecapVisibility(mount) {
+  const entry = mount.querySelector("[data-recap-only]");
+  if (entry) entry.hidden = !recapMenuVisible;
 }
 
 /* ---------------- Tab bar ---------------- */

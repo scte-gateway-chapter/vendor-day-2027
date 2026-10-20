@@ -109,7 +109,14 @@ function renderInline(text) {
 
 /* ---------------- Escaping ---------------- */
 
-function escapeHtml(s) {
+/**
+ * HTML-escape a string so it is safe to interpolate into element text or
+ * attribute values. Exported so other views can share this one copy
+ * instead of pasting the same five-character map everywhere.
+ * @param {string} s
+ * @returns {string}
+ */
+export function escapeHtml(s) {
   return String(s).replace(/[&<>"']/g, (c) => (
     { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
   ));
