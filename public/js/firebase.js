@@ -157,7 +157,12 @@ export async function getDoc(path) {
   const res = await fetch(docUrl(path), { headers: { Accept: "application/json" } });
   if (res.status === 404) return null;
   if (!res.ok) {
-    throw new Error(`getDoc(${path}) failed: ${res.status} ${res.statusText}`);
+    const err = new Error(`getDoc(${path}) failed: ${res.status} ${res.statusText}`);
+    // Attach the raw status so callers can distinguish, e.g., 403 (rule
+    // denied the read — used by the Attendees detail view to treat an
+    // opted-out doc as "not available" without revealing why).
+    err.status = res.status;
+    throw err;
   }
   const doc = await res.json();
   return firestoreDocToJs(doc);

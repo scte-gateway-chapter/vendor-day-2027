@@ -1602,3 +1602,293 @@ a:focus-visible {
 .skeleton-announcement {
   box-shadow: none;
 }
+
+/* ---------- Attendee Directory views (Task 13) ---------- */
+
+/* Combined sticky area holding the "Attendees + count" header line and
+   the search field. Keeping both inside one sticky container means the
+   two rows pin as a single unit when the user scrolls, which avoids the
+   fragile top-offset math of two separately-sticky elements and matches
+   the spec's requirement that the search stays reachable while scrolling. */
+.attendees-sticky-wrap {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 5;
+  background: var(--surface);
+  margin: 0 0 var(--space-md);
+  border-bottom: 1px solid var(--border-neutral);
+}
+/* The shared .view-sticky-header inside the wrap drops its own sticky
+   positioning and border so it reads as a plain row of the wrap. */
+.attendees-sticky-wrap > .view-sticky-header {
+  position: static;
+  margin: 0;
+  border-bottom: none;
+}
+
+.view-sticky-header .attendee-count-live {
+  margin-left: auto;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  padding-left: var(--space-sm);
+  text-align: right;
+  flex: 0 0 auto;
+}
+
+.attendees-sticky-search {
+  padding: 0 0 var(--space-sm);
+}
+
+/* Positioned relative so the clear button can sit inside the input's
+   trailing padding. The input itself reserves right padding so typed
+   text does not slide under the clear button. */
+.attendee-search-field {
+  position: relative;
+  display: block;
+}
+
+.attendee-search-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 44px 10px 12px;
+  font: inherit;
+  font-size: 16px; /* 16px prevents iOS from auto-zooming on focus */
+  color: var(--body-text);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+
+/* Clear button sits over the input's trailing padding. 44x44 touch
+   target with a visible glyph; hidden until the input has content. */
+.attendee-search-clear {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary-text);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  border-radius: var(--radius);
+}
+.attendee-search-clear:hover,
+.attendee-search-clear:focus-visible {
+  color: var(--brand-green-text);
+  background: var(--surface-alt);
+}
+
+/* List container is a plain block so each row controls its own spacing. */
+.attendees-list {
+  display: block;
+}
+
+/* Attendee row is an anchor so right/middle-click opens naturally.
+   Flex layout keeps the chevron pinned to the trailing edge while the
+   name + meta block grows between them. */
+.attendee-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--body-text);
+  text-decoration: none;
+  margin-bottom: var(--space-sm);
+  min-height: 56px;
+}
+.attendee-row:hover,
+.attendee-row:focus-visible {
+  background: var(--surface-alt);
+  color: var(--body-text);
+}
+
+.attendee-row__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.attendee-row__name {
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+
+.attendee-row__meta {
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.attendee-row__chevron {
+  flex: 0 0 auto;
+  color: var(--secondary-text);
+  font-size: 1.5rem;
+  line-height: 1;
+  padding-left: var(--space-sm);
+}
+
+/* Loading skeleton row: shared `.skeleton-row` shimmer sized close to a
+   real attendee row so the list doesn't jump on first paint. */
+.attendee-row-skeleton {
+  margin-bottom: var(--space-sm);
+  border-radius: var(--radius);
+}
+
+/* Error strip inside the list when a poll failed but we still have
+   cached content to show beneath it. Mirrors Agenda/Sponsors/Map. */
+.attendees-error-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.attendees-error-strip .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+.attendees-empty-search .btn-secondary {
+  margin-top: var(--space-sm);
+}
+
+/* ---------- Attendee detail modal ---------- */
+
+/* Overlay fills the viewport, 35% dark backdrop. position: fixed so the
+   modal escapes the normal flow of #view-root and lives on top of
+   everything. The overlay itself is a flex container that centers the
+   modal; on narrow viewports the modal fills the viewport. */
+.attendee-modal-overlay {
+  position: fixed;
+  inset: 0;
+  /* z-index 40 sits above the sticky header/tab-bar (z-index 10) and
+     the banner root (z-index 20) but below toasts (z-index 50) so
+     error toasts fired from inside the modal remain visible. */
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+}
+
+.attendee-modal {
+  position: relative;
+  width: 100%;
+  max-width: 32rem;
+  max-height: 80vh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-lg);
+  outline: none;
+}
+
+/* Close button in the top-right corner. 44x44 touch target with a
+   visible glyph. */
+.attendee-modal__close {
+  position: absolute;
+  top: var(--space-xs);
+  right: var(--space-xs);
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary-text);
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  border-radius: var(--radius);
+}
+.attendee-modal__close:hover,
+.attendee-modal__close:focus-visible {
+  color: var(--brand-green-text);
+  background: var(--surface-alt);
+}
+
+.attendee-modal__body {
+  padding-right: calc(44px + var(--space-xs));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.attendee-modal__name {
+  margin: 0;
+  font-size: var(--font-size-xl);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-xl);
+}
+
+.attendee-modal__company {
+  margin: 0;
+  color: var(--body-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+.attendee-modal__title {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+
+/* Footer note styled as muted secondary text so it reads as a policy
+   note rather than part of the attendee's listing. */
+.attendee-modal__note {
+  margin: var(--space-md) 0 0;
+  color: var(--muted-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  border-top: 1px solid var(--border-neutral);
+  padding-top: var(--space-sm);
+}
+
+.attendee-modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+}
+
+/* Offline strip inside the modal — same visual language as the global
+   offline banner but scoped so it only shows while the modal is open. */
+.attendee-modal__offline {
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  margin-bottom: var(--space-sm);
+}
+
+/* Narrow viewports: switch from centered half-sheet to full-screen so
+   the modal fills the viewport and leaves no visible backdrop edges. */
+@media (max-width: 600px) {
+  .attendee-modal-overlay {
+    padding: 0;
+    background: rgba(0, 0, 0, 0.35);
+  }
+  .attendee-modal {
+    width: 100vw;
+    height: 100vh;
+    max-width: none;
+    max-height: none;
+    border-radius: 0;
+  }
+}
