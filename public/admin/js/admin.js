@@ -17,6 +17,7 @@ import { isAdminAuthenticated, clearAdminSession } from "./admin-auth.js";
 import renderAdminLogin from "./login.js";
 import renderAdminDashboard from "./dashboard.js";
 import renderAgendaEditor from "./agenda-editor.js";
+import renderSponsorsEditor from "./sponsors-editor.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
@@ -137,6 +138,21 @@ function handleAgendaRoute() {
   syncPhoneDropdown("agenda");
 }
 
+function handleSponsorsRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderSponsorsEditor(host).catch((err) => {
+      console.warn("[admin] sponsors editor render failed:", err);
+    });
+  }
+  syncPhoneDropdown("sponsors");
+}
+
 function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
@@ -161,8 +177,13 @@ function registerRoutes() {
   router.register("#/", handleRootRoute);
   router.register("#/dashboard", handleDashboardRoute);
   router.register("#/agenda", handleAgendaRoute);
+  router.register("#/sponsors", handleSponsorsRoute);
   for (const route of PROTECTED_ROUTES) {
-    if (route.slug === "dashboard" || route.slug === "agenda") continue;
+    if (
+      route.slug === "dashboard" ||
+      route.slug === "agenda" ||
+      route.slug === "sponsors"
+    ) continue;
     router.register(`#/${route.slug}`, () =>
       handleProtectedRoute(route.slug, route.label, route.taskLabel),
     );

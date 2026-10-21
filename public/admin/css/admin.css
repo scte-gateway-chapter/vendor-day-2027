@@ -828,3 +828,306 @@ body.admin-modal-open {
     border-radius: var(--radius-lg);
   }
 }
+
+/* ---------- Admin Sponsors editor (Task 19) ---------- */
+
+.admin-sponsors-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Sticky secondary header — mirrors the Agenda editor so the two admin
+   list editors share the same visual weight. */
+.admin-sponsors-header {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-sponsors-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.admin-sponsors-header__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+.admin-sponsors-header__meta {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.admin-sponsors-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.admin-sponsors-error-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.admin-sponsors-error-strip .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+.admin-sponsors-empty {
+  text-align: left;
+}
+.admin-sponsors-empty .btn-primary {
+  margin-top: var(--space-sm);
+}
+
+/* --- Tier group --- */
+
+.admin-sponsor-tier-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.admin-sponsor-tier-label {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+
+/* --- Sponsor card --- */
+
+/* Logo | body | actions. On narrow phones the actions wrap under the
+   body (handled by the flex layout plus the small-width media query
+   below) so reorder / Edit / Delete remain 44x44 without overflowing. */
+.admin-sponsor-card {
+  display: grid;
+  grid-template-columns: 48px 1fr auto;
+  grid-template-areas: "logo body actions";
+  gap: var(--space-sm) var(--space-md);
+  align-items: center;
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+
+.admin-sponsor-card__logo {
+  grid-area: logo;
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+
+.admin-sponsor-card__body {
+  grid-area: body;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.admin-sponsor-card__name {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+  overflow-wrap: anywhere;
+}
+.admin-sponsor-card__meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+  align-items: center;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-sponsor-card__tier-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--border-neutral);
+  border-radius: 9999px;
+  background: var(--surface-alt);
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text);
+}
+.admin-sponsor-card__booth {
+  color: var(--secondary-text);
+}
+
+.admin-sponsor-card__actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Reorder buttons: compact 44x44 with up/down glyphs. Grouped so they
+   read as a single reorder control to assistive tech. */
+.admin-sponsor-reorder-group {
+  display: inline-flex;
+  flex-direction: row;
+  gap: 2px;
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.admin-sponsor-reorder-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  border: 0;
+  background: var(--surface);
+  color: var(--brand-green-text);
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.admin-sponsor-reorder-btn:hover:not(:disabled),
+.admin-sponsor-reorder-btn:focus-visible:not(:disabled) {
+  background: #EEF8F2;
+}
+.admin-sponsor-reorder-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.admin-sponsor-reorder-btn + .admin-sponsor-reorder-btn {
+  border-left: 1px solid var(--border-neutral);
+}
+
+/* Edit/Delete buttons — same shape as agenda editor action buttons. */
+.admin-sponsor-action-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--brand-green);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--brand-green-text);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.admin-sponsor-action-btn:hover:not(:disabled),
+.admin-sponsor-action-btn:focus-visible:not(:disabled) {
+  background: #EEF8F2;
+}
+.admin-sponsor-action-btn--delete {
+  border-color: var(--error-red);
+  color: var(--error-text);
+}
+.admin-sponsor-action-btn--delete:hover:not(:disabled),
+.admin-sponsor-action-btn--delete:focus-visible:not(:disabled) {
+  background: var(--error-bg);
+}
+.admin-sponsor-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Phone widths: cards stack logo/body on top and actions below so the
+   action cluster has room to breathe without pushing the body text
+   under a logo-sized gutter. */
+@media (max-width: 600px) {
+  .admin-sponsor-card {
+    grid-template-columns: 48px 1fr;
+    grid-template-areas:
+      "logo body"
+      "actions actions";
+  }
+  .admin-sponsor-card__actions {
+    justify-content: flex-start;
+  }
+}
+
+/* --- Logo preview in the Add/Edit modal --- */
+
+.admin-sponsor-logo-preview-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+.admin-sponsor-logo-preview {
+  width: 96px;
+  height: 96px;
+  object-fit: contain;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  flex: 0 0 auto;
+}
+.admin-sponsor-logo-controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+.admin-sponsor-logo-replace-btn {
+  align-self: flex-start;
+  min-height: 44px;
+}
+.admin-sponsor-logo-filename {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  overflow-wrap: anywhere;
+}
+
+/* The native file input stays mounted (so the hidden `required` and
+   `accept` behavior still runs) but offscreen so the admin interacts
+   with the styled Replace button instead. */
+.admin-sponsor-logo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.admin-sponsor-logo-help {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* The group's own text-only label (used when no <label for> is useful,
+   e.g. the Logo group — the file input itself is sr-only). */
+.admin-form-group__label-text {
+  font-weight: 600;
+  color: var(--body-text);
+}
+
+/* Note under the delete confirm so the admin knows the R2 object stays. */
+.admin-sponsor-delete-note {
+  margin: var(--space-sm) 0 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
