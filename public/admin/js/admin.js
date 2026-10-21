@@ -18,6 +18,7 @@ import renderAdminLogin from "./login.js";
 import renderAdminDashboard from "./dashboard.js";
 import renderAgendaEditor from "./agenda-editor.js";
 import renderSponsorsEditor from "./sponsors-editor.js";
+import renderMapUploader from "./map-uploader.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
@@ -153,6 +154,21 @@ function handleSponsorsRoute() {
   syncPhoneDropdown("sponsors");
 }
 
+function handleMapRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderMapUploader(host).catch((err) => {
+      console.warn("[admin] map uploader render failed:", err);
+    });
+  }
+  syncPhoneDropdown("map");
+}
+
 function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
@@ -178,11 +194,13 @@ function registerRoutes() {
   router.register("#/dashboard", handleDashboardRoute);
   router.register("#/agenda", handleAgendaRoute);
   router.register("#/sponsors", handleSponsorsRoute);
+  router.register("#/map", handleMapRoute);
   for (const route of PROTECTED_ROUTES) {
     if (
       route.slug === "dashboard" ||
       route.slug === "agenda" ||
-      route.slug === "sponsors"
+      route.slug === "sponsors" ||
+      route.slug === "map"
     ) continue;
     router.register(`#/${route.slug}`, () =>
       handleProtectedRoute(route.slug, route.label, route.taskLabel),
