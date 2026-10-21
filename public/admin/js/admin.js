@@ -1,33 +1,70 @@
-// admin.js — admin shell bootstrap (Task 16).
+// admin.js — admin shell bootstrap (Task 16, Task 17).
 //
 // Owns the tiny hash router inside /admin/, the pre-paint guard that
 // bounces direct links to protected hashes through the login screen, the
 // logout button handler, and the <body>-level class that hides the
 // left-rail nav + logout button when the user is not authenticated.
 //
-// Tasks 17+ replace the placeholder route handlers below with real editor
-// views. Each route is a drop-in replacement.
+// Task 17 wires the real Dashboard view and adds a per-view cleanup
+// registry (registerAdminViewCleanup / router.beforeEach drain) so the
+// dashboard's health poll and card refresh intervals stop the moment the
+// user navigates away. Tasks 18-24 replace the remaining placeholder
+// routes with real editor views and reuse the same cleanup hook.
 "use strict";
 
 import * as router from "/js/router.js";
 import { isAdminAuthenticated, clearAdminSession } from "./admin-auth.js";
 import renderAdminLogin from "./login.js";
+import renderAdminDashboard from "./dashboard.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
-/** Protected routes mapped to their placeholder label. Later tasks swap
- *  the renderer; the route list stays stable so navigation keeps working. */
+/** Protected routes mapped to their placeholder label + the task that
+ *  replaces each placeholder with a real editor. The route list stays
+ *  stable across tasks so navigation keeps working. The dashboard entry
+ *  is special-cased in registerRoutes() to call renderAdminDashboard
+ *  instead of the placeholder renderer. */
 const PROTECTED_ROUTES = [
-  { slug: "dashboard", label: "Admin Dashboard" },
-  { slug: "agenda", label: "Admin Agenda" },
-  { slug: "sponsors", label: "Admin Sponsors" },
-  { slug: "map", label: "Admin Venue Map" },
-  { slug: "announcements", label: "Admin Announcements" },
-  { slug: "attendees", label: "Admin Attendees" },
-  { slug: "feedback", label: "Admin Feedback" },
-  { slug: "recap", label: "Admin Recap" },
-  { slug: "settings", label: "Admin Settings" },
+  { slug: "dashboard", label: "Admin Dashboard", taskLabel: "Task 17" },
+  { slug: "agenda", label: "Admin Agenda", taskLabel: "Task 18" },
+  { slug: "sponsors", label: "Admin Sponsors", taskLabel: "Task 19" },
+  { slug: "map", label: "Admin Venue Map", taskLabel: "Task 20" },
+  { slug: "announcements", label: "Admin Announcements", taskLabel: "Task 21" },
+  { slug: "attendees", label: "Admin Attendees", taskLabel: "Task 22" },
+  { slug: "feedback", label: "Admin Feedback", taskLabel: "Task 23" },
+  { slug: "recap", label: "Admin Recap", taskLabel: "Task 24" },
+  { slug: "settings", label: "Admin Settings", taskLabel: "a later task" },
 ];
+
+/* ----------------- Per-view cleanup registry ----------------- */
+
+/** Views that spin up subscriptions, intervals, or visibility listeners
+ *  register a teardown here from their render function. The router's
+ *  beforeEach hook drains this before dispatching the next route so
+ *  background work (health check loop, 30s card poll) stops the moment
+ *  the user navigates away. One slot by design — views that wire
+ *  multiple handles should compose them into a single function. */
+let pendingAdminViewCleanup = null;
+
+/**
+ * Register (or clear) the current admin view's teardown. Called from a
+ * view's render function. Passing a non-function clears the slot.
+ * @param {() => void} fn
+ */
+export function registerAdminViewCleanup(fn) {
+  pendingAdminViewCleanup = typeof fn === "function" ? fn : null;
+}
+
+function runPendingAdminViewCleanup() {
+  const fn = pendingAdminViewCleanup;
+  pendingAdminViewCleanup = null;
+  if (!fn) return;
+  try {
+    fn();
+  } catch (err) {
+    console.warn("[admin] view cleanup failed:", err);
+  }
+}
 
 function viewHost() {
   return document.getElementById("admin-view-root");
@@ -37,7 +74,7 @@ function setAuthShell(authenticated) {
   document.body.classList.toggle(UNAUTH_CLASS, !authenticated);
 }
 
-function renderPlaceholder(title) {
+function renderPlaceholder(title, taskLabel) {
   const host = viewHost();
   if (!host) return;
   host.innerHTML = "";
@@ -45,9 +82,9 @@ function renderPlaceholder(title) {
   section.className = "placeholder-card";
   section.setAttribute("aria-live", "polite");
   const h2 = document.createElement("h2");
-  h2.textContent = `${title} — Task 17`;
+  h2.textContent = `${title} \u2014 ${taskLabel}`;
   const p = document.createElement("p");
-  p.textContent = `${title} lands in Task 17. Login and session storage are live now.`;
+  p.textContent = `${title} lands in ${taskLabel}. The dashboard links here for navigation.`;
   section.append(h2, p);
   host.appendChild(section);
   document.title = `${title} \u2014 Vendor Day 2027`;
@@ -68,7 +105,22 @@ function handleRootRoute() {
   syncPhoneDropdown(null);
 }
 
-function handleProtectedRoute(slug, label) {
+function handleDashboardRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderAdminDashboard(host).catch((err) => {
+      console.warn("[admin] dashboard render failed:", err);
+    });
+  }
+  syncPhoneDropdown("dashboard");
+}
+
+function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
     // the login screen does not re-enter the pre-auth URL.
@@ -76,7 +128,7 @@ function handleProtectedRoute(slug, label) {
     return;
   }
   setAuthShell(true);
-  renderPlaceholder(label);
+  renderPlaceholder(label, taskLabel);
   syncPhoneDropdown(slug);
 }
 
@@ -90,13 +142,19 @@ function handleLogoutRoute() {
 
 function registerRoutes() {
   router.register("#/", handleRootRoute);
+  router.register("#/dashboard", handleDashboardRoute);
   for (const route of PROTECTED_ROUTES) {
+    if (route.slug === "dashboard") continue;
     router.register(`#/${route.slug}`, () =>
-      handleProtectedRoute(route.slug, route.label),
+      handleProtectedRoute(route.slug, route.label, route.taskLabel),
     );
   }
   router.register("#/logout", handleLogoutRoute);
   router.register("*", () => router.navigate("/"));
+  // Drain any view-level teardown before the next route mounts so views
+  // with background work (dashboard health poll, 30s card refresh) stop
+  // when the user navigates elsewhere.
+  router.beforeEach(() => runPendingAdminViewCleanup());
 }
 
 function wireLogoutButton() {

@@ -195,3 +195,251 @@ body.admin-shell--unauthenticated .admin-header__logout {
     grid-template-columns: 1fr;
   }
 }
+
+/* ---------- Admin Dashboard (Task 17) ---------- */
+
+/* Vertical stack. The dashboard renders directly into #admin-view-root,
+   which already supplies the outer padding; this container just owns
+   the gap between sections. */
+.admin-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+/* --- Health strip --- */
+
+/* Compact row of pills. Wraps on narrow viewports so each pill keeps a
+   readable label without horizontal scroll. */
+.admin-health-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.admin-health-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: 9999px;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-health-pill__dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--muted-text);
+  flex: 0 0 auto;
+}
+.admin-health-pill__label {
+  min-width: 0;
+}
+
+.admin-health-pill--pending {
+  background: var(--surface-alt);
+  border-color: var(--border-neutral);
+  color: var(--secondary-text);
+}
+.admin-health-pill--pending .admin-health-pill__dot {
+  background: var(--muted-text);
+}
+
+.admin-health-pill--ok {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+.admin-health-pill--ok .admin-health-pill__dot {
+  background: var(--brand-green);
+}
+
+.admin-health-pill--fail {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error-text);
+}
+.admin-health-pill--fail .admin-health-pill__dot {
+  background: var(--error-red);
+}
+
+/* --- Content-area cards --- */
+
+/* Responsive CSS grid. `auto-fill` + `minmax(260px, 1fr)` gives us 1 column
+   on narrow phones, 2 on larger phones / tablets, and 3+ on wide screens
+   without any media queries. */
+.admin-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-md);
+}
+
+.admin-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+/* Subtle hover state so the clickable surface reads as a link target. */
+.admin-card:hover,
+.admin-card:focus-within {
+  background: var(--surface-alt);
+}
+
+/* The whole card is a link. The anchor wraps the title, status, and meta
+   so a tap anywhere in the content block routes to the editor. Removing
+   the default underline + inherit color keeps the title / status / meta
+   type palette untouched. */
+.admin-card__link {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  color: inherit;
+  text-decoration: none;
+  min-height: 44px;
+}
+.admin-card__link:hover,
+.admin-card__link:focus-visible {
+  color: inherit;
+}
+
+.admin-card__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+
+.admin-card__status {
+  margin: 0;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+
+.admin-card__meta {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* "Edit…" is a visible affordance. In the loaded state the whole card is
+   a link so the affordance is a plain styled <span>; aria-hidden removes
+   the duplicated name from the accessibility tree. In the error state the
+   dedicated retry button takes over and this affordance is not rendered. */
+.admin-card__action {
+  align-self: flex-start;
+  margin-top: var(--space-xs);
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+.admin-card--error .admin-card__status {
+  color: var(--secondary-text);
+}
+
+.admin-card__retry {
+  align-self: flex-start;
+  margin-top: var(--space-xs);
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* --- Recent push sends --- */
+
+.admin-recent-pushes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.admin-recent-pushes__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+
+.admin-recent-pushes__body {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.admin-recent-pushes__empty {
+  margin: 0;
+  color: var(--secondary-text);
+}
+
+.admin-recent-pushes__error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.admin-recent-pushes__error .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+.admin-recent-push-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-sm) 0;
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-recent-push-row:last-child {
+  border-bottom: 0;
+}
+
+.admin-recent-push-row__body {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.admin-recent-push-row__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+  /* Single-line clamp so long titles stay on one row. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-recent-push-row__byline {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.admin-recent-push-row__time {
+  flex: 0 0 auto;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
