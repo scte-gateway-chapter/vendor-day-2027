@@ -98,6 +98,30 @@ export async function adminFetch(url, options = {}) {
   }
 }
 
+/**
+ * Convenience wrapper over `/api/firestore-read` for admin UIs that need to
+ * see collections the client-side rules deny or filter (feedbackResponses,
+ * opted-out attendees). With a `docId` it fetches that one document and
+ * returns the plain object or `null` on 404; without one it returns the
+ * array of docs (empty on an empty collection). All error paths bubble as
+ * the same `.code`-tagged Errors `adminFetch` throws.
+ *
+ * @param {string} collection One of the allow-listed collections in
+ *   `functions/api/firestore-read.js`.
+ * @param {{ limit?: number, docId?: string }} [opts]
+ * @returns {Promise<object | object[] | null>}
+ */
+export async function adminReadCollection(collection, { limit = 500, docId } = {}) {
+  const params = new URLSearchParams({ collection });
+  if (typeof limit === "number" && limit > 0) {
+    params.set("limit", String(limit));
+  }
+  if (docId) params.set("docId", docId);
+  const result = await adminFetch(`/api/firestore-read?${params.toString()}`);
+  if (docId) return result?.doc ?? null;
+  return Array.isArray(result?.docs) ? result.docs : [];
+}
+
 async function safeJson(response) {
   try {
     return await response.clone().json();

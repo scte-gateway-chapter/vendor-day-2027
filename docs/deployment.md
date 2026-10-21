@@ -154,6 +154,7 @@ code in this repo lives at `functions/api/*.js`:
 
 - `functions/api/admin-login.js` → `/api/admin-login`
 - `functions/api/config.js` → `/api/config`
+- `functions/api/firestore-read.js` → `/api/firestore-read`
 - `functions/api/firestore-write.js` → `/api/firestore-write`
 - `functions/api/send-push.js` → `/api/send-push`
 - `functions/api/upload.js` → `/api/upload`
@@ -288,6 +289,15 @@ curl.exe -i -X POST "https://<domain>/api/firestore-write" `
   -H "Content-Type: application/json" `
   --data "{ `"collection`": `"agenda`", `"docId`": `"test`", `"op`": `"set`", `"data`": {} }"
 
+# Firestore read: no Authorization header → 401
+curl.exe -i --ssl-no-revoke "https://<domain>/api/firestore-read?collection=attendees"
+
+# Firestore read: valid JWT → 200 and { docs: [...] }. Grab a token from
+# devtools after signing into /admin (sessionStorage key
+# "vendorday2027.admin.jwt") and paste it in place of <jwt>.
+curl.exe -i --ssl-no-revoke -H "Authorization: Bearer <jwt>" `
+  "https://<domain>/api/firestore-read?collection=attendees&limit=10"
+
 # Send push: no Authorization → 401
 curl.exe -i -X POST "https://<domain>/api/send-push" `
   -H "Content-Type: application/json" `
@@ -309,6 +319,8 @@ Expected results:
 - The sixth wrong attempt returns HTTP `429`, a `Retry-After: 600` header, and
   `{"error":"Too many attempts","retryAfterSec":600}`.
 - Both firestore-write smoke calls return `401 Unauthorized`.
+- The firestore-read call without a JWT returns `401 Unauthorized`; with a
+  valid JWT it returns `200` and `{"docs":[...]}`.
 - The send-push smoke call returns `401 Unauthorized`.
 - The upload smoke call returns `401 Unauthorized`.
 - The healthcheck returns `200` with `{"firestore":"ok","onesignal":"ok"}`

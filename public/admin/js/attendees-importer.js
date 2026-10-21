@@ -33,10 +33,9 @@
 // the sticky-header "updated X ago by Y" doesn't lie about a stale import.
 "use strict";
 
-import { initFirestore, getCollection } from "/js/firebase.js";
 import * as ui from "/js/ui.js";
 import { installFocusTrap } from "/js/utils/focus-trap.js";
-import { adminFetch } from "./admin-fetch.js";
+import { adminFetch, adminReadCollection } from "./admin-fetch.js";
 import { registerAdminViewCleanup } from "./admin.js";
 import { formatLastEditedPhrase } from "./collision-check.js";
 import { parseCsv, trimRow } from "./csv-parse.js";
@@ -94,12 +93,6 @@ export default async function renderAttendeesImporter(host) {
     previewSection,
   );
 
-  // Prime /api/config; cached inside firebase.js after the first call.
-  const configReady = initFirestore().catch((err) => {
-    console.warn("[admin-attendees] /api/config load failed:", err);
-    return null;
-  });
-
   let online = typeof navigator === "undefined" || navigator.onLine !== false;
 
   /** @type {object[] | null} */
@@ -116,14 +109,17 @@ export default async function renderAttendeesImporter(host) {
   let activeOverlay = null;
 
   async function refreshDirectory() {
-    try { await configReady; } catch (_err) { /* non-fatal */ }
     try {
       // Unfiltered read — the importer needs opted-out rows too for the
-      // "Y opted out" count and so a merge can preserve their state.
-      const list = await getCollection("attendees");
+      // "Y opted out" count and so a merge can preserve their state. The
+      // public getCollection("attendees") call is filtered server-side by
+      // firestore.rules (reads require optedOut == false), so admins read
+      // through /api/firestore-read which uses the service account.
+      const list = await adminReadCollection("attendees", { limit: 1000 });
       currentDirectory = Array.isArray(list) ? list : [];
       directoryErr = null;
     } catch (err) {
+      if (err?.code === "session-expired") return;
       console.warn("[admin-attendees] directory load failed:", err);
       directoryErr = err;
       currentDirectory = null;

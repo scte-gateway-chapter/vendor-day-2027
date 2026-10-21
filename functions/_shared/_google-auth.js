@@ -181,6 +181,58 @@ export function firestorePayloadFromObject(obj) {
   return { fields };
 }
 
+/**
+ * Convert a Firestore REST document (`{ name, fields, createTime, updateTime }`)
+ * into a plain JS object. The inverse of `firestorePayloadFromObject`;
+ * supports string, integer, double, boolean, null, timestamp (as ISO
+ * string), reference, geopoint, bytes, array, and map. Attaches `id`
+ * derived from the resource name so callers don't have to parse it.
+ */
+export function firestoreDocToPlain(doc) {
+  if (!doc) return null;
+  const out = firestoreFieldsToPlain(doc.fields || {});
+  if (typeof doc.name === "string") {
+    const idx = doc.name.lastIndexOf("/");
+    if (idx >= 0) out.id = decodeURIComponent(doc.name.slice(idx + 1));
+  }
+  return out;
+}
+
+function firestoreFieldsToPlain(fields) {
+  const out = {};
+  for (const [k, v] of Object.entries(fields || {})) {
+    out[k] = firestoreValueToPlain(v);
+  }
+  return out;
+}
+
+function firestoreValueToPlain(v) {
+  if (v == null) return null;
+  if ("stringValue" in v) return v.stringValue;
+  if ("integerValue" in v) {
+    // Firestore returns 64-bit ints as strings. Preserve the string when
+    // the magnitude exceeds JS's safe-integer range to avoid silent
+    // precision loss on serialization back to the client.
+    const n = Number(v.integerValue);
+    return Number.isSafeInteger(n) ? n : v.integerValue;
+  }
+  if ("doubleValue" in v) return Number(v.doubleValue);
+  if ("booleanValue" in v) return Boolean(v.booleanValue);
+  if ("nullValue" in v) return null;
+  if ("timestampValue" in v) return v.timestampValue; // ISO 8601 string
+  if ("bytesValue" in v) return v.bytesValue;
+  if ("referenceValue" in v) return v.referenceValue;
+  if ("geoPointValue" in v) return v.geoPointValue;
+  if ("arrayValue" in v) {
+    const values = Array.isArray(v.arrayValue?.values) ? v.arrayValue.values : [];
+    return values.map(firestoreValueToPlain);
+  }
+  if ("mapValue" in v) {
+    return firestoreFieldsToPlain(v.mapValue?.fields || {});
+  }
+  return null;
+}
+
 function toFirestoreValue(v) {
   if (v === null || v === undefined) return { nullValue: null };
   if (typeof v === "string") return { stringValue: v };

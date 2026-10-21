@@ -21,6 +21,8 @@ Candidates considered:
 
 **Decision: Firebase Firestore on the Spark free plan.** It is the lightest free-tier option that gives us (a) direct browser writes from the admin UI with no server component, (b) a real-time snapshot API so attendee devices get agenda and announcement updates within seconds, (c) sufficient free quota for an event of a few hundred attendees for an entire year, and (d) no new deploy pipeline. Writes are gated by the admin passphrase check at the application layer, and Firestore security rules enforce "reads are public, writes require a specific Firebase App Check token issued only to admins" (details in section 6). Vendor-lock risk is low because the data model is a flat set of JSON documents and could be migrated to Supabase or JSON files later.
 
+**Admin reads of restricted collections.** Firestore rules deny client reads of `feedbackResponses` entirely and restrict `attendees` reads to `optedOut == false`. Admin UIs that need to read those collections (feedback results, attendee importer dedup) do so through the Pages Function `/api/firestore-read`, which validates the admin JWT and reads via the service account with Admin-SDK-equivalent privileges — same pattern as `/api/firestore-write`.
+
 ### Asset storage: Cloudflare R2
 
 User-uploaded images (sponsor logos, the venue map, and recap photos) live in a **Cloudflare R2** bucket named `vendor-day-2027-assets`. The original design called for Firebase Storage, but Firebase changed its policy in 2026 to require the paid Blaze plan for any Storage usage, which breaks our free-tier posture. R2's free tier (10 GB storage, 1 M writes/month, 10 M reads/month, zero egress) is a clean replacement and keeps every runtime dependency in Cloudflare.
@@ -485,6 +487,7 @@ Per the resolved decision and Requirement 2.1, the push opt-in is not shown duri
 │   └── api/             # (Cloudflare Pages Functions mirror)
 ├── functions/           # Cloudflare Pages Functions source
 │   ├── admin-login.js
+│   ├── firestore-read.js
 │   ├── firestore-write.js
 │   ├── send-push.js
 │   └── upload.js        # multipart upload broker → Cloudflare R2
