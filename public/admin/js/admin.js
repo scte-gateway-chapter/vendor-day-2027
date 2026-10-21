@@ -20,6 +20,7 @@ import renderAgendaEditor from "./agenda-editor.js";
 import renderSponsorsEditor from "./sponsors-editor.js";
 import renderMapUploader from "./map-uploader.js";
 import renderAnnouncementsComposer from "./announcements-composer.js";
+import renderAttendeesImporter from "./attendees-importer.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
@@ -185,6 +186,21 @@ function handleAnnouncementsRoute() {
   syncPhoneDropdown("announcements");
 }
 
+function handleAttendeesRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderAttendeesImporter(host).catch((err) => {
+      console.warn("[admin] attendees importer render failed:", err);
+    });
+  }
+  syncPhoneDropdown("attendees");
+}
+
 function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
@@ -212,13 +228,15 @@ function registerRoutes() {
   router.register("#/sponsors", handleSponsorsRoute);
   router.register("#/map", handleMapRoute);
   router.register("#/announcements", handleAnnouncementsRoute);
+  router.register("#/attendees", handleAttendeesRoute);
   for (const route of PROTECTED_ROUTES) {
     if (
       route.slug === "dashboard" ||
       route.slug === "agenda" ||
       route.slug === "sponsors" ||
       route.slug === "map" ||
-      route.slug === "announcements"
+      route.slug === "announcements" ||
+      route.slug === "attendees"
     ) continue;
     router.register(`#/${route.slug}`, () =>
       handleProtectedRoute(route.slug, route.label, route.taskLabel),

@@ -1959,3 +1959,409 @@ body.admin-modal-open {
   font-size: var(--font-size-sm);
   line-height: var(--line-height-sm);
 }
+
+/* ---------- Admin Attendee importer (Task 22) ---------- */
+
+/* Container vertical stack. Mirrors the other admin editors so the
+   importer anchors the same under the main admin header. */
+.admin-attendees-importer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Sticky secondary header — title + optional "Open Google Sheet" link,
+   meta line beneath. Right-aligned link stays reachable while scrolling
+   the preview table. */
+.admin-attendees-header {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-attendees-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.admin-attendees-header__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+.admin-attendees-header__sheet-link {
+  color: var(--brand-green-text);
+  font-weight: 600;
+  text-decoration: none;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.admin-attendees-header__sheet-link:hover,
+.admin-attendees-header__sheet-link:focus-visible {
+  text-decoration: underline;
+}
+.admin-attendees-header__meta {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* --- Directory summary --- */
+
+/* Short paragraph above the upload card. Pulled out as its own block so
+   the summary refreshes without touching the uploader state. */
+.admin-attendees-summary {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+.admin-attendees-summary__text {
+  margin: 0;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.admin-attendees-summary .status-error {
+  margin: 0;
+}
+
+/* --- Upload card + drop zone --- */
+
+.admin-upload-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+.admin-upload-dropzone {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  border: 2px dashed var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  text-align: center;
+  cursor: pointer;
+}
+.admin-upload-dropzone:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}
+.admin-upload-dropzone--active {
+  border-color: var(--brand-green);
+  background: #EEF8F2;
+}
+.admin-upload-dropzone__title {
+  margin: 0;
+  color: var(--body-text);
+  font-weight: 600;
+}
+.admin-upload-dropzone__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  align-items: center;
+  justify-content: center;
+}
+.admin-upload-dropzone__filename {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  overflow-wrap: anywhere;
+}
+
+/* The native file input stays mounted so the browser's picker + accept
+   validation keep working, but offscreen so admins interact with the
+   styled Choose CSV button or drop zone. */
+.admin-upload-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.admin-upload-help {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-upload-help a {
+  color: var(--brand-green-text);
+}
+
+/* --- Header mapping block --- */
+
+.admin-header-mapping {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+.admin-header-mapping__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+.admin-header-mapping__detail {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-header-mapping-row {
+  display: grid;
+  grid-template-columns: 10rem 1fr;
+  gap: var(--space-sm) var(--space-md);
+  align-items: center;
+}
+.admin-header-mapping-row__label {
+  font-weight: 600;
+  color: var(--body-text);
+}
+.admin-header-mapping-row__select {
+  min-height: 44px;
+  width: 100%;
+}
+@media (max-width: 600px) {
+  .admin-header-mapping-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Preview counts + mapping warning --- */
+
+.admin-preview-counts {
+  margin: 0;
+  color: var(--body-text);
+  font-weight: 600;
+  line-height: var(--line-height-md);
+}
+.admin-preview-mapping-warning {
+  margin: 0;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+
+.admin-preview-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* --- Preview table ---
+   Overflow-x on the wrapper lets the table scroll horizontally on
+   narrow phones so Include / Opt out / Status columns stay reachable
+   without a redesign. */
+.admin-preview-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+.admin-preview-table {
+  width: 100%;
+  min-width: 48rem;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+  background: var(--surface);
+}
+.admin-preview-table th,
+.admin-preview-table td {
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-preview-table th {
+  background: var(--surface-alt);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.admin-preview-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.admin-preview-cell--index {
+  color: var(--secondary-text);
+  font-variant-numeric: tabular-nums;
+  width: 3rem;
+}
+.admin-preview-cell--include,
+.admin-preview-cell--optout {
+  width: 4rem;
+  text-align: center;
+}
+.admin-preview-cell--include input,
+.admin-preview-cell--optout input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brand-green);
+}
+.admin-preview-cell--status {
+  min-width: 10rem;
+}
+.admin-preview-empty {
+  color: var(--muted-text);
+  font-style: italic;
+}
+.admin-preview-status--ok {
+  color: var(--success-text);
+  font-weight: 600;
+}
+.admin-preview-status--invalid {
+  color: var(--error-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* Row tints. Invalid rows read as "cannot import" via a soft red
+   background; opt-out rows read as "will be hidden from attendees" via
+   a muted gray-green so the admin sees the state at a glance. */
+.admin-preview-row--invalid td {
+  background: var(--error-bg);
+}
+.admin-preview-row--opted-out td {
+  background: var(--surface-alt);
+  color: var(--secondary-text);
+}
+
+/* --- Commit buttons --- */
+
+.admin-commit-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+@media (max-width: 600px) {
+  .admin-commit-buttons {
+    justify-content: stretch;
+  }
+  .admin-commit-buttons .btn-primary,
+  .admin-commit-buttons .btn-destructive {
+    width: 100%;
+  }
+}
+
+/* --- Import progress overlay --- */
+
+/* Reuses .admin-modal-overlay / .admin-modal from the shared modal
+   shell so the progress dialog traps focus and locks the background. */
+.admin-modal-overlay--import {
+  z-index: 65;
+}
+.admin-modal--import .admin-modal__body {
+  gap: var(--space-sm);
+  display: flex;
+  flex-direction: column;
+}
+.admin-import-progress {
+  margin: 0;
+  color: var(--body-text);
+  font-weight: 600;
+}
+.admin-import-progress-detail {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-import-progress-bar {
+  width: 100%;
+  height: 10px;
+  background: var(--skeleton-bg);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.admin-import-progress-bar__fill {
+  display: block;
+  height: 100%;
+  width: 0%;
+  background: var(--brand-green);
+  transition: width 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-import-progress-bar__fill {
+    transition: none;
+  }
+}
+
+/* Post-import summary — stays mounted inside the same overlay so the
+   admin reads the result without losing focus context. */
+.admin-import-summary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--border-neutral);
+}
+.admin-import-summary__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+.admin-import-summary__detail {
+  margin: 0;
+  color: var(--body-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+.admin-import-summary__failed {
+  margin: 0;
+  padding-left: var(--space-lg);
+  color: var(--error-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+  overflow-wrap: anywhere;
+}
+.admin-import-summary__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+@media (max-width: 600px) {
+  .admin-import-summary__actions {
+    justify-content: stretch;
+  }
+  .admin-import-summary__actions .btn-primary,
+  .admin-import-summary__actions .btn-secondary {
+    width: 100%;
+  }
+}
