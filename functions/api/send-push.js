@@ -83,7 +83,9 @@ async function runHealthcheck(env, cors) {
     });
     result.firestore = "ok";
   } catch (err) {
-    console.warn("Firestore healthcheck failed:", err?.message || err);
+    const msg = err?.message || String(err);
+    result.firestoreError = msg;
+    console.warn("Firestore healthcheck failed:", msg);
   }
 
   // OneSignal reachability: GET /notifications?app_id=<id>&limit=1. Using the
@@ -95,7 +97,8 @@ async function runHealthcheck(env, cors) {
   try {
     const appId = env.ONESIGNAL_APP_ID;
     const key = env.ONESIGNAL_REST_API_KEY;
-    if (!appId || !key) throw new Error("Missing OneSignal env vars");
+    if (!appId) throw new Error("ONESIGNAL_APP_ID env var is not set");
+    if (!key) throw new Error("ONESIGNAL_REST_API_KEY env var is not set");
     const res = await fetch(
       `${ONESIGNAL_BASE}/notifications?app_id=${encodeURIComponent(appId)}&limit=1`,
       {
@@ -108,14 +111,14 @@ async function runHealthcheck(env, cors) {
     if (res.ok) {
       result.onesignal = "ok";
     } else {
-      console.warn(
-        "OneSignal healthcheck non-2xx:",
-        res.status,
-        await res.text(),
-      );
+      const bodyText = (await res.text()) || "";
+      result.onesignalError = `${res.status} ${res.statusText}: ${bodyText.slice(0, 300)}`;
+      console.warn("OneSignal healthcheck non-2xx:", result.onesignalError);
     }
   } catch (err) {
-    console.warn("OneSignal healthcheck failed:", err?.message || err);
+    const msg = err?.message || String(err);
+    result.onesignalError = msg;
+    console.warn("OneSignal healthcheck failed:", msg);
   }
 
   return jsonResponse(result, 200, cors);
