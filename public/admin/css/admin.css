@@ -1406,3 +1406,556 @@ body.admin-modal-open {
     width: 100%;
   }
 }
+
+/* ---------- Admin Announcements composer (Task 21) ---------- */
+
+/* Container vertical stack. Mirrors the Agenda / Sponsors editors so
+   all admin editor surfaces anchor the same under the main header. */
+.admin-announcements-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Sticky secondary header: title + collection-wide "updated X ago by Y"
+   line. The announcements composer has no header-level Add button
+   because composing lives inline below the header. */
+.admin-announcements-header {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-announcements-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.admin-announcements-header__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+.admin-announcements-header__meta {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* --- "Published but push did not send" banner ---
+   Yellow warning palette so it reads distinct from the composer's own
+   inline error (red). Sits at the top of the view (above the composer)
+   so the admin sees the retry affordance as soon as the publish
+   returns. */
+.admin-push-banner-sent-partial {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  border-radius: var(--radius);
+  color: var(--warning-text);
+}
+.admin-push-banner-sent-partial__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.admin-push-banner-sent-partial__title {
+  margin: 0;
+  font-weight: 700;
+}
+.admin-push-banner-sent-partial__detail {
+  margin: 0;
+  color: var(--warning-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-push-banner-sent-partial__error {
+  margin: 0;
+  color: var(--warning-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.admin-push-banner-sent-partial__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+.admin-push-banner-sent-partial__retry {
+  position: relative;
+  min-width: 8rem;
+}
+.admin-push-banner-sent-partial__retry--loading .admin-push-banner-sent-partial__retry-label {
+  padding-right: 1.5rem;
+}
+.admin-push-banner-sent-partial__retry--loading::after {
+  content: "";
+  position: absolute;
+  right: var(--space-md);
+  top: 50%;
+  margin-top: -0.5rem;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #FFF;
+  border-radius: 50%;
+  animation: admin-ann-retry-spin 0.8s linear infinite;
+}
+@keyframes admin-ann-retry-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .admin-push-banner-sent-partial__retry--loading::after { animation: none; }
+}
+
+/* --- Composer card --- */
+
+.admin-announcement-composer-host {
+  display: block;
+}
+
+.admin-announcement-composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+
+/* Edit-mode variant adds a visible left ribbon so it reads as "you are
+   editing an existing announcement" rather than composing a new one. */
+.admin-announcement-composer--edit {
+  border-left: 4px solid var(--brand-green);
+}
+
+.admin-announcement-composer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.admin-announcement-composer__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+.admin-announcement-composer__cancel-edit {
+  color: var(--brand-green-text);
+}
+
+/* Inline red error banner inside the composer (Firestore write failed,
+   validation error, etc.). Hidden by default; the composer code flips
+   `hidden` on it. Reuses .status-error-like colors via the palette tokens. */
+.admin-announcement-composer__error {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error-text);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+
+/* Collision banner. Reuses the warning palette so it reads distinct
+   from the composer error (red). */
+.admin-announcement-composer__conflict {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  color: var(--warning-text);
+  border-radius: var(--radius);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+.admin-announcement-composer__conflict p { margin: 0; }
+.admin-announcement-composer__conflict-actions {
+  display: flex;
+  gap: var(--space-sm);
+  margin-top: var(--space-sm);
+  justify-content: flex-end;
+}
+
+/* Fields column + preview column. Single-column on narrow viewports;
+   two-column at tablet width so the admin can watch the preview update
+   while they type. */
+.admin-announcement-composer-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+}
+@media (min-width: 48rem) {
+  .admin-announcement-composer-grid {
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+}
+
+.admin-announcement-composer__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.admin-announcement-composer__fields .admin-form-group:last-child {
+  margin-bottom: 0;
+}
+
+.admin-announcement-composer__body-field {
+  min-height: 10rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+}
+
+/* Markdown reference popover. Anchored under the Markdown reference
+   link below the body textarea. */
+.admin-announcement-composer__md-help {
+  position: relative;
+  margin-top: var(--space-xs);
+}
+.admin-announcement-composer__md-ref-btn {
+  color: var(--brand-green-text);
+  font-size: var(--font-size-sm);
+  min-height: 32px;
+}
+.admin-announcement-composer__md-ref-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 20;
+  margin-top: var(--space-xs);
+  min-width: min(100%, 20rem);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-announcement-composer__md-ref-popover ul {
+  margin: 0;
+  padding-left: var(--space-md);
+  list-style: disc;
+}
+.admin-announcement-composer__md-ref-popover li {
+  margin: var(--space-xs) 0;
+}
+.admin-announcement-composer__md-ref-popover code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.875rem;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  padding: 0 4px;
+}
+
+/* Preview column. The preview card reuses the attendee's
+   `.announcement-card` body styles so the admin sees close-to-final
+   markdown rendering. */
+.admin-announcement-composer__preview-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.admin-announcement-composer__preview-label {
+  margin: 0;
+  font-weight: 600;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-announcement-composer__preview-card {
+  flex: 1 1 auto;
+  min-height: 10rem;
+  padding: var(--space-md);
+  margin-bottom: 0;
+  background: var(--surface-alt);
+  border: 1px dashed var(--border-neutral);
+  border-radius: var(--radius);
+  /* The attendee `.announcement-card` pre-sets a scaleable transform
+     for the highlight animation; neutralize it here so the preview
+     card doesn't inherit that transform baseline. */
+  transform: none;
+  transition: none;
+  box-shadow: none;
+}
+.admin-announcement-composer__preview-empty {
+  margin: 0;
+  color: var(--secondary-text);
+  font-style: italic;
+}
+
+/* Push toggle + preview row. Single column; the preview appears below
+   the checkbox so the admin can scan it before deciding. */
+.admin-announcement-composer__push-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.admin-announcement-composer__push-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-height: 44px;
+  cursor: pointer;
+  color: var(--body-text);
+  font-weight: 500;
+}
+.admin-announcement-composer__push-toggle {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  accent-color: var(--brand-green);
+}
+
+/* Push preview block. Muted palette so it reads as a preview, not a
+   primary surface. */
+.admin-push-preview {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+.admin-push-preview__header {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.admin-push-preview__title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--body-text);
+}
+.admin-push-preview__body {
+  margin: var(--space-xs) 0 0;
+  color: var(--body-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-push-preview__note {
+  margin: var(--space-sm) 0 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  font-style: italic;
+}
+
+/* Footer actions (Clear + Publish, or just Save changes on edit). */
+.admin-announcement-composer__footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+.admin-announcement-composer__submit {
+  position: relative;
+  min-width: 8rem;
+}
+.admin-announcement-composer__submit--loading .admin-announcement-composer__submit-label {
+  padding-right: 1.5rem;
+}
+.admin-announcement-composer__submit--loading::after {
+  content: "";
+  position: absolute;
+  right: var(--space-md);
+  top: 50%;
+  margin-top: -0.5rem;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #FFF;
+  border-radius: 50%;
+  animation: admin-ann-submit-spin 0.8s linear infinite;
+}
+@keyframes admin-ann-submit-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .admin-announcement-composer__submit--loading::after { animation: none; }
+}
+
+@media (max-width: 600px) {
+  .admin-announcement-composer__footer {
+    justify-content: stretch;
+  }
+  .admin-announcement-composer__footer .btn-primary,
+  .admin-announcement-composer__footer .btn-secondary {
+    width: 100%;
+  }
+}
+
+/* --- Past announcements list --- */
+
+.admin-announcement-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.admin-announcement-list__heading {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--brand-green-text);
+  line-height: var(--line-height-md);
+}
+.admin-announcement-list__error-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.admin-announcement-list__error-strip .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+.admin-announcement-list__empty {
+  text-align: left;
+}
+
+/* Card row for past announcements. Body text + meta line stacked on
+   the left; Edit/Delete action column on the right. */
+.admin-announcement-card {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-sm) var(--space-md);
+  align-items: center;
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+
+.admin-announcement-card__body-wrap {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.admin-announcement-card__header {
+  display: flex;
+  min-width: 0;
+}
+.admin-announcement-card__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  font-weight: 600;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+  /* Single-line clamp so long titles stay on one row. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  line-clamp: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-announcement-card__body {
+  margin: 0;
+  color: var(--body-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  /* Two-line clamp on the body preview. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
+}
+.admin-announcement-card__meta {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs) var(--space-sm);
+  align-items: center;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-announcement-card__push-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border: 1px solid var(--success-border);
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-radius: 9999px;
+  font-size: var(--font-size-sm);
+}
+
+.admin-announcement-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.admin-announcement-action-btn {
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-xs) var(--space-sm);
+  border: 1px solid var(--brand-green);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--brand-green-text);
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.admin-announcement-action-btn:hover:not(:disabled),
+.admin-announcement-action-btn:focus-visible:not(:disabled) {
+  background: #EEF8F2;
+}
+.admin-announcement-action-btn--delete {
+  border-color: var(--error-red);
+  color: var(--error-text);
+}
+.admin-announcement-action-btn--delete:hover:not(:disabled),
+.admin-announcement-action-btn--delete:focus-visible:not(:disabled) {
+  background: var(--error-bg);
+}
+.admin-announcement-action-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Phone widths: cards stack body on top and actions below so the
+   action cluster has room to breathe. */
+@media (max-width: 600px) {
+  .admin-announcement-card {
+    grid-template-columns: 1fr;
+  }
+  .admin-announcement-card__actions {
+    justify-content: flex-start;
+  }
+}
+
+/* Note under the delete confirm so the admin knows pushes can't be
+   recalled. */
+.admin-announcement-delete-note {
+  margin: var(--space-sm) 0 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
