@@ -28,6 +28,7 @@
 import { initFirestore, getDoc } from "../firebase.js";
 import * as router from "../router.js";
 import * as ui from "../ui.js";
+import { installFocusTrap } from "../utils/focus-trap.js";
 import { getCachedAttendee, navigatedFromList } from "./attendees.js";
 
 /**
@@ -74,7 +75,7 @@ export async function renderAttendeeDetail(host, { id } = {}) {
   // previously-focused element on construction and restores it when
   // uninstall() runs.
   const close = () => closeModal(uninstall);
-  const uninstall = installFocusTrap(modal, close);
+  const uninstall = installFocusTrap(modal, { onEscape: close });
   // Click on the dark backdrop closes the modal. Clicks inside the modal
   // body (which is a child of the overlay via the modal element) do not
   // bubble as `target === overlay`, so this test is safe.
@@ -170,63 +171,6 @@ function closeModal(uninstallFocusTrap) {
     try { window.history.back(); return; } catch (_err) { /* fall through */ }
   }
   router.navigate("/attendees");
-}
-
-/* ---------------- Focus trap ---------------- */
-
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
-
-/**
- * Install a lightweight focus trap on `modal`. Captures the previously-
- * focused element on construction so uninstall() can restore it; traps
- * Tab/Shift+Tab inside the modal; invokes `onEscape` when the user
- * presses Escape.
- *
- * @param {HTMLElement} modal
- * @param {() => void} onEscape
- * @returns {() => void} uninstall
- */
-function installFocusTrap(modal, onEscape) {
-  const previousFocus = document.activeElement instanceof HTMLElement
-    ? document.activeElement
-    : null;
-
-  function onKeydown(ev) {
-    if (ev.key === "Escape") {
-      ev.preventDefault();
-      onEscape();
-      return;
-    }
-    if (ev.key !== "Tab") return;
-    const focusable = Array.from(modal.querySelectorAll(FOCUSABLE_SELECTOR));
-    if (focusable.length === 0) {
-      ev.preventDefault();
-      modal.focus();
-      return;
-    }
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    const active = document.activeElement;
-    if (ev.shiftKey) {
-      if (active === first || !modal.contains(active)) {
-        ev.preventDefault();
-        last.focus();
-      }
-    } else if (active === last || !modal.contains(active)) {
-      ev.preventDefault();
-      first.focus();
-    }
-  }
-
-  modal.addEventListener("keydown", onKeydown);
-
-  return function uninstall() {
-    modal.removeEventListener("keydown", onKeydown);
-    if (previousFocus && typeof previousFocus.focus === "function") {
-      try { previousFocus.focus(); } catch (_err) { /* no-op */ }
-    }
-  };
 }
 
 /* ---------------- Body renderers ---------------- */

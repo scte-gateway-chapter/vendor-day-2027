@@ -16,14 +16,16 @@ import * as router from "/js/router.js";
 import { isAdminAuthenticated, clearAdminSession } from "./admin-auth.js";
 import renderAdminLogin from "./login.js";
 import renderAdminDashboard from "./dashboard.js";
+import renderAgendaEditor from "./agenda-editor.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
 /** Protected routes mapped to their placeholder label + the task that
  *  replaces each placeholder with a real editor. The route list stays
- *  stable across tasks so navigation keeps working. The dashboard entry
- *  is special-cased in registerRoutes() to call renderAdminDashboard
- *  instead of the placeholder renderer. */
+ *  stable across tasks so navigation keeps working. Dashboard and Agenda
+ *  are special-cased in registerRoutes() to call their real renderers;
+ *  the rest fall through to the placeholder renderer until their task
+ *  lands. */
 const PROTECTED_ROUTES = [
   { slug: "dashboard", label: "Admin Dashboard", taskLabel: "Task 17" },
   { slug: "agenda", label: "Admin Agenda", taskLabel: "Task 18" },
@@ -120,6 +122,21 @@ function handleDashboardRoute() {
   syncPhoneDropdown("dashboard");
 }
 
+function handleAgendaRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderAgendaEditor(host).catch((err) => {
+      console.warn("[admin] agenda editor render failed:", err);
+    });
+  }
+  syncPhoneDropdown("agenda");
+}
+
 function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
@@ -143,8 +160,9 @@ function handleLogoutRoute() {
 function registerRoutes() {
   router.register("#/", handleRootRoute);
   router.register("#/dashboard", handleDashboardRoute);
+  router.register("#/agenda", handleAgendaRoute);
   for (const route of PROTECTED_ROUTES) {
-    if (route.slug === "dashboard") continue;
+    if (route.slug === "dashboard" || route.slug === "agenda") continue;
     router.register(`#/${route.slug}`, () =>
       handleProtectedRoute(route.slug, route.label, route.taskLabel),
     );
