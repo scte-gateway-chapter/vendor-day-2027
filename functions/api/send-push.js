@@ -86,13 +86,18 @@ async function runHealthcheck(env, cors) {
     console.warn("Firestore healthcheck failed:", err?.message || err);
   }
 
-  // OneSignal reachability: GET /apps/<app_id>.
+  // OneSignal reachability: GET /notifications?app_id=<id>&limit=1. Using the
+  // app-level REST API key only grants access to app-scoped endpoints such as
+  // `/notifications` and `/players`; the `/apps/<id>` endpoint requires the
+  // organization-level User Auth Key which the chapter does not have. A GET
+  // against the notifications collection returns 200 regardless of whether
+  // any notifications exist and proves the REST key is valid for the app.
   try {
     const appId = env.ONESIGNAL_APP_ID;
     const key = env.ONESIGNAL_REST_API_KEY;
     if (!appId || !key) throw new Error("Missing OneSignal env vars");
     const res = await fetch(
-      `${ONESIGNAL_BASE}/apps/${encodeURIComponent(appId)}`,
+      `${ONESIGNAL_BASE}/notifications?app_id=${encodeURIComponent(appId)}&limit=1`,
       {
         headers: {
           Authorization: `Basic ${key}`,
