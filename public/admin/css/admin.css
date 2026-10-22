@@ -2840,3 +2840,484 @@ body.admin-modal-open {
   font-size: var(--font-size-sm);
   font-style: italic;
 }
+
+/* ================================================================
+ * Admin Recap editor (Task 24)
+ * ================================================================ */
+
+.admin-recap-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* Sticky secondary header — matches the Agenda / Sponsors / Map /
+   Announcements / Feedback editor headers. */
+.admin-recap-header {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-recap-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.admin-recap-header__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+.admin-recap-header__meta {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.admin-recap-editor__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.admin-recap-stale-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.admin-recap-stale-strip .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+
+/* ---------- Publication state card ---------- */
+
+.admin-recap-publication-card {
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.admin-recap-publication-card--on {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+}
+.admin-recap-publication-card--off {
+  background: var(--surface-alt);
+}
+.admin-recap-publication-card__header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.admin-recap-publication-card__pill {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+.admin-recap-publication-card__pill--off {
+  background: var(--border-neutral);
+  color: var(--secondary-text);
+}
+.admin-recap-publication-card__pill--on {
+  background: var(--brand-green);
+  color: #FFF;
+}
+.admin-recap-publication-card__text {
+  margin: 0;
+  color: var(--body-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  flex: 1 1 20rem;
+}
+.admin-recap-publication-card__timestamp {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+}
+.admin-recap-publication-card__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.admin-recap-unpublish-btn {
+  min-height: 44px;
+}
+
+/* ---------- Save banner slots ---------- */
+
+.admin-recap-save-banner {
+  margin: 0;
+}
+.admin-recap-save-banner p {
+  margin: 0;
+}
+
+/* ---------- Editor sections ---------- */
+
+.admin-recap-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius-lg);
+}
+.admin-recap-field-label {
+  font-weight: 600;
+  color: var(--body-text);
+  font-size: var(--font-size-md);
+}
+.admin-recap-field-help {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.admin-recap-thanks-field,
+.admin-recap-acknowledgments-field {
+  width: 100%;
+  min-height: 4.5rem;
+  resize: vertical;
+}
+
+/* Acknowledgments two-column layout at wide viewports, stacked below. */
+.admin-recap-acknowledgments-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-md);
+}
+.admin-recap-acknowledgments-field-column,
+.admin-recap-acknowledgments-preview-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  min-width: 0;
+}
+@media (min-width: 56rem) {
+  .admin-recap-acknowledgments-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.admin-recap-acknowledgments-preview-label {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.admin-recap-acknowledgments-preview {
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  min-height: 6rem;
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+  overflow-wrap: anywhere;
+}
+.admin-recap-acknowledgments-preview p {
+  margin: 0 0 var(--space-sm);
+}
+.admin-recap-acknowledgments-preview p:last-child {
+  margin-bottom: 0;
+}
+.admin-recap-acknowledgments-preview a {
+  color: var(--brand-green-text);
+  text-decoration: underline;
+}
+.admin-recap-acknowledgments-preview code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  padding: 0 4px;
+}
+.admin-recap-acknowledgments-preview-empty {
+  margin: 0;
+  color: var(--muted-text);
+  font-style: italic;
+}
+
+/* Markdown reference popover (shared pattern with Announcements). */
+.admin-recap-md-help {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.admin-recap-md-ref-btn {
+  min-height: 36px;
+  padding: 0;
+  background: none;
+  border: 0;
+  color: var(--brand-green-text);
+  font: inherit;
+  font-size: var(--font-size-sm);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.admin-recap-md-ref-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 10;
+  margin-top: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-sm);
+  max-width: min(28rem, 90vw);
+}
+.admin-recap-md-ref-popover ul {
+  margin: 0;
+  padding-left: var(--space-md);
+}
+.admin-recap-md-ref-popover li {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  margin: 2px 0;
+}
+
+/* ---------- Photos grid ---------- */
+
+.admin-recap-photos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-sm);
+}
+.admin-recap-photo-tile {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+.admin-recap-photo-tile__thumb-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  background: var(--surface-alt);
+  border-radius: var(--radius);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-recap-photo-tile__thumb-wrap--placeholder {
+  min-height: 150px;
+}
+.admin-recap-photo-tile__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.admin-recap-photo-tile__reorder {
+  display: flex;
+  gap: var(--space-xs);
+  justify-content: flex-start;
+}
+.admin-recap-photo-tile__reorder-btn {
+  min-width: 44px;
+  min-height: 32px;
+  padding: 0 var(--space-xs);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  color: var(--brand-green-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+.admin-recap-photo-tile__reorder-btn:hover:not(:disabled) {
+  background: var(--surface-alt);
+}
+.admin-recap-photo-tile__reorder-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.admin-recap-photo-tile__caption-label {
+  display: block;
+  width: 100%;
+}
+.admin-recap-photo-tile__caption {
+  width: 100%;
+  min-height: 36px;
+}
+.admin-recap-photo-tile__delete {
+  min-height: 44px;
+  align-self: stretch;
+}
+.admin-recap-photo-tile__status {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  text-align: center;
+}
+.admin-recap-photo-tile__status--error {
+  color: var(--error-text);
+  font-weight: 600;
+}
+.admin-recap-photo-tile__error-actions {
+  display: flex;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.admin-recap-photo-tile__error-actions .btn-primary,
+.admin-recap-photo-tile__error-actions .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+}
+.admin-recap-photo-tile--uploading {
+  position: relative;
+}
+.admin-recap-photo-tile__shimmer {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    var(--surface-alt) 0%,
+    rgba(255, 255, 255, 0.6) 50%,
+    var(--surface-alt) 100%
+  );
+  background-size: 200% 100%;
+  animation: admin-recap-shimmer 1.2s linear infinite;
+}
+@keyframes admin-recap-shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-recap-photo-tile__shimmer { animation: none; }
+}
+.admin-recap-photo-tile__error-icon {
+  margin: 0;
+  color: var(--error-text);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.admin-recap-photo-tile--error {
+  border-color: var(--error-border);
+  background: var(--error-bg);
+}
+
+/* "Add photo" tile styled as a dashed drop zone. */
+.admin-recap-add-photo-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  min-height: 180px;
+  padding: var(--space-md);
+  background: var(--surface-alt);
+  border: 2px dashed var(--border-neutral);
+  border-radius: var(--radius);
+  color: var(--brand-green-text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.admin-recap-add-photo-tile:hover:not(:disabled) {
+  background: var(--surface);
+  border-color: var(--brand-green);
+}
+.admin-recap-add-photo-tile:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.admin-recap-add-photo-tile__plus {
+  font-size: 2rem;
+  line-height: 1;
+}
+.admin-recap-add-photo-tile__label {
+  font-size: var(--font-size-md);
+}
+
+/* ---------- Push toggle + preview ---------- */
+
+.admin-recap-push-toggle {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius-lg);
+}
+.admin-recap-push-toggle--disabled {
+  background: var(--surface-alt);
+  color: var(--muted-text);
+}
+.admin-recap-push-toggle__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  font-size: var(--font-size-md);
+  color: var(--body-text);
+}
+.admin-recap-push-toggle--disabled .admin-recap-push-toggle__label {
+  cursor: not-allowed;
+  color: var(--muted-text);
+}
+.admin-recap-push-toggle__input {
+  min-width: 22px;
+  min-height: 22px;
+}
+.admin-recap-push-preview {
+  /* Overrides the shared .admin-push-preview margin so it sits flush
+     inside the push-toggle card. */
+  margin: 0;
+}
+
+/* ---------- Save / Publish button row ---------- */
+
+.admin-recap-save-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+}
+.admin-recap-save-buttons .btn-primary,
+.admin-recap-save-buttons .btn-secondary {
+  min-height: 44px;
+  min-width: 8rem;
+}
+@media (max-width: 600px) {
+  .admin-recap-save-buttons {
+    justify-content: stretch;
+  }
+  .admin-recap-save-buttons .btn-primary,
+  .admin-recap-save-buttons .btn-secondary {
+    width: 100%;
+  }
+}

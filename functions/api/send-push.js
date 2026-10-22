@@ -132,23 +132,41 @@ async function sendPush(env, request, cors, authPayload) {
     return jsonResponse({ error: "Invalid JSON body" }, 400, cors);
   }
 
+  // `announcementId` is required when the push should deep-link into a
+  // specific announcement AND when we want the broker to stamp
+  // `pushSent` / `pushSentAt` on the announcement doc. For the Recap
+  // push (Task 24) the caller passes an explicit `url` (pointing at
+  // `#/recap`) and omits `announcementId`; in that mode the secondary
+  // Firestore stamping below is skipped so we don't pollute the
+  // `announcements` collection with a bogus doc.
   const announcementId = trimmedStr(body?.announcementId, 1, 80);
   const title = trimmedStr(body?.title, 1, 120);
   const bodyPreview = trimmedStr(body?.bodyPreview, 1, 120);
-  if (!announcementId || !title || !bodyPreview) {
+  const explicitUrl =
+    typeof body?.url === "string" && body.url.trim() ? body.url.trim() : "";
+  if (!title || !bodyPreview) {
     return jsonResponse(
       {
         error:
-          "Missing or invalid announcementId, title, or bodyPreview (title and bodyPreview are 1-120 chars)",
+          "Missing or invalid title or bodyPreview (both are 1-120 chars)",
+      },
+      400,
+      cors,
+    );
+  }
+  if (!announcementId && !explicitUrl) {
+    return jsonResponse(
+      {
+        error:
+          "Request must include announcementId (to deep-link an announcement) or an explicit url",
       },
       400,
       cors,
     );
   }
   const url =
-    typeof body?.url === "string" && body.url.trim()
-      ? body.url.trim()
-      : `${APP_PUBLIC_ORIGIN}/#/announcements/${encodeURIComponent(announcementId)}`;
+    explicitUrl
+      || `${APP_PUBLIC_ORIGIN}/#/announcements/${encodeURIComponent(announcementId)}`;
 
   const appId = env.ONESIGNAL_APP_ID;
   const key = env.ONESIGNAL_REST_API_KEY;
@@ -210,30 +228,36 @@ async function sendPush(env, request, cors, authPayload) {
   }
 
   // Best-effort follow-up: flip pushSent / pushSentAt on the announcement doc.
+  // Only applies when the push is bound to an announcement doc (Task 21).
+  // Recap pushes (Task 24) omit `announcementId` because there is no
+  // announcement to stamp — skip the secondary write in that case so we
+  // don't pollute the announcements collection.
   // If this fails we still return success to the client — the primary send
   // already landed, and the admin can mark it manually from the dashboard.
-  try {
-    const now = new Date().toISOString();
-    const stamped = {
-      pushSent: true,
-      pushSentAt: now,
-      updatedAt: now,
-      updatedBy:
-        typeof authPayload?.sub === "string" ? authPayload.sub : "admin",
-    };
-    const mask = Object.keys(stamped)
-      .map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
-      .join("&");
-    await firestoreRequest(env, {
-      method: "PATCH",
-      path: `announcements/${encodeURIComponent(announcementId)}?${mask}`,
-      body: firestorePayloadFromObject(stamped),
-    });
-  } catch (err) {
-    console.warn(
-      "Secondary Firestore write (pushSent flag) failed:",
-      err?.message || err,
-    );
+  if (announcementId) {
+    try {
+      const now = new Date().toISOString();
+      const stamped = {
+        pushSent: true,
+        pushSentAt: now,
+        updatedAt: now,
+        updatedBy:
+          typeof authPayload?.sub === "string" ? authPayload.sub : "admin",
+      };
+      const mask = Object.keys(stamped)
+        .map((k) => `updateMask.fieldPaths=${encodeURIComponent(k)}`)
+        .join("&");
+      await firestoreRequest(env, {
+        method: "PATCH",
+        path: `announcements/${encodeURIComponent(announcementId)}?${mask}`,
+        body: firestorePayloadFromObject(stamped),
+      });
+    } catch (err) {
+      console.warn(
+        "Secondary Firestore write (pushSent flag) failed:",
+        err?.message || err,
+      );
+    }
   }
 
   return jsonResponse({ ok: true, oneSignal: oneSignalBody }, 200, cors);
