@@ -73,9 +73,15 @@ function detectPlatform() {
  */
 function platformShortCircuit() {
   const p = detectPlatform();
-  if (!p.hasNotification) return "unsupported";
+  // iOS-specific checks come BEFORE the generic hasNotification probe.
+  // iOS Safari exposes `window.Notification` inconsistently across versions —
+  // some iOS 16.4+ builds have it only inside the installed PWA, not in the
+  // Safari tab. Checking iOS install state first lets us tell the user
+  // "install this app to receive notifications" instead of the less helpful
+  // "notifications aren't available in this browser".
   if (p.isNonSafariIOS) return "unsupported";
   if (p.isIOS && !p.standalone) return "ios-install-required";
+  if (!p.hasNotification) return "unsupported";
   return null;
 }
 
@@ -276,50 +282,48 @@ export async function requestPermissionAndSubscribe() {
     return state;
   }
 
-  // state === "not-prompted" — kick init if it hasn't started.
+  // state === "not-prompted".
+  //
+  // Call the native Notification.requestPermission() FIRST. On iOS 16.4+
+  // standalone PWAs this is the most reliable path: it fires the OS prompt
+  // synchronously enough to preserve the user-gesture context, and on
+  // Android Chrome it works identically. Routing through the OneSignal
+  // SDK's wrapper after an async init has been observed to lose the
+  // gesture context on iOS, leaving the prompt invisible and the caller
+  // hanging. We let the SDK pick up the subscription asynchronously
+  // afterward if init completes within a short budget.
+  if (typeof Notification === "undefined" || typeof Notification.requestPermission !== "function") {
+    return "unsupported";
+  }
+
+  let nativeResult;
+  try {
+    // Normalize the two historical call shapes (callback vs. Promise).
+    nativeResult = await Promise.resolve(Notification.requestPermission());
+  } catch (err) {
+    console.warn("[onesignal] native requestPermission failed:", err);
+    return "denied";
+  }
+
+  if (nativeResult === "denied") return "denied";
+  if (nativeResult !== "granted") return "default";
+
+  // Permission granted. Kick SDK init if it has not started, and give it
+  // up to 5 seconds to settle so the subscription registers. If it does
+  // not settle in time, the SDK will pick it up on the next page load;
+  // the UI returns "granted" either way since the OS permission is set.
   if (!sdkReady) initOneSignal();
   try {
-    await sdkReady;
+    await Promise.race([
+      sdkReady,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("SDK init timeout")), 5000),
+      ),
+    ]);
   } catch (_err) {
-    /* non-fatal; try the native fallback below */
+    /* non-fatal — permission is already granted */
   }
-
-  if (
-    !sdkUnavailable &&
-    oneSignalNS &&
-    oneSignalNS.Notifications &&
-    typeof oneSignalNS.Notifications.requestPermission === "function"
-  ) {
-    try {
-      await oneSignalNS.Notifications.requestPermission();
-    } catch (err) {
-      console.warn("[onesignal] requestPermission failed:", err);
-      // Re-query anyway — the browser may still have recorded the
-      // permission even if the SDK threw.
-    }
-    return await getSubscriptionState();
-  }
-
-  // SDK path unavailable — fall back to the native prompt so the UI
-  // still has a definitive outcome.
-  if (
-    typeof Notification !== "undefined" &&
-    typeof Notification.requestPermission === "function"
-  ) {
-    try {
-      // Some older browsers only support the callback form of
-      // requestPermission; Promise.resolve normalizes both.
-      const result = await Promise.resolve(Notification.requestPermission());
-      if (result === "granted" || result === "denied" || result === "default") {
-        return result;
-      }
-      return "default";
-    } catch (err) {
-      console.warn("[onesignal] native requestPermission failed:", err);
-      return "denied";
-    }
-  }
-  return "unsupported";
+  return await getSubscriptionState();
 }
 
 /* ---------------- Listeners ---------------- */

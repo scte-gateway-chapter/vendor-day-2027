@@ -1,5 +1,4 @@
 {
-  "//": "TODO (Task 7): the icon PNGs referenced below are generated from the chapter logo in the icon-generation task. Until then, the files do not exist and requests for them will 404. The manifest itself is wired correctly so the browser accepts the PWA metadata.",
   "name": "SCTE Gateway Chapter Vendor Day 2027",
   "short_name": "Vendor Day 2027",
   "start_url": "/",
