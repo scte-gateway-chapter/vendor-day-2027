@@ -409,6 +409,9 @@ export default async function renderRecapEditor(host) {
         stamp.hidden = true;
       }
       actions.hidden = false;
+      // Clear the inline `display: none` the else branch sets so the CSS
+      // layout (flex) can take over again on re-publish.
+      actions.style.removeProperty("display");
       const disable = !online || unpublishing;
       unpublishBtn.disabled = disable;
       if (!online) unpublishBtn.setAttribute("title", OFFLINE_TOOLTIP);
@@ -420,7 +423,18 @@ export default async function renderRecapEditor(host) {
       text.textContent =
         "Recap not published. Attendees do NOT see the Recap entry in the More menu.";
       stamp.hidden = true;
+      // Defensive: also reset the unpublish button's stale label and disabled
+      // state. If a CSS rule overrides the browser default [hidden]{display:none}
+      // (the actions wrapper uses `display: flex` on wide viewports), the user
+      // would otherwise see "Unpublishing…" lingering after a successful
+      // unpublish. Hiding both via the attribute AND an inline style sidesteps
+      // CSS-specificity surprises.
       actions.hidden = true;
+      actions.style.display = "none";
+      unpublishBtn.textContent = "Unpublish recap";
+      unpublishBtn.disabled = true;
+      unpublishBtn.removeAttribute("aria-disabled");
+      unpublishBtn.removeAttribute("title");
     }
   }
 
