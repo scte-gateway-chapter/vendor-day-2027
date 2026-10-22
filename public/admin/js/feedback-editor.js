@@ -95,6 +95,14 @@ export default async function renderFeedbackEditor(host) {
   /** @type {Error | null} */
   let configErr = null;
   let sawFirstConfig = false;
+  /**
+   * Whether we have ever synced the draft from a server read. This is distinct
+   * from `serverConfig === null`: the config doc may be legitimately absent
+   * (first-time setup, before anyone has saved), in which case every poll
+   * still returns null but we should only sync-into-the-draft once, not on
+   * every subsequent poll (which would clobber the admin's in-progress edits).
+   */
+  let hasInitiallySynced = false;
   let configErrorToasted = false;
   let activationInFlight = false;
   let saveInFlight = false;
@@ -163,8 +171,13 @@ export default async function renderFeedbackEditor(host) {
     const nextQuestions = normalizeQuestions(nextConfig?.questions);
     const nextSnapshotTs = snapshotEditingTimestamp(nextConfig);
 
+    // "Clean" means either this is the very first server read (so there is
+    // nothing to preserve), OR the current draft is byte-identical to what
+    // we last synced from the server (so the admin hasn't started editing
+    // yet and it is safe to pick up colleagues' changes). Any divergence
+    // leaves the draft alone; the Save flow handles collisions on write.
     const draftWasClean =
-      serverConfig === null ||
+      !hasInitiallySynced ||
       serializeQuestions(draftQuestions) ===
         serializeQuestions(normalizeQuestions(serverConfig?.questions));
 
@@ -173,6 +186,7 @@ export default async function renderFeedbackEditor(host) {
       draftQuestions = cloneQuestions(nextQuestions);
       snapshotTs = nextSnapshotTs;
     }
+    hasInitiallySynced = true;
   }
 
   /* ---------------- Responses load (admin broker) ---------------- */
