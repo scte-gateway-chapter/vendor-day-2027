@@ -28,8 +28,11 @@
 // deep link whose id is no longer present renders the feed normally
 // plus an info toast.
 //
-// OneSignal integration is a Task 12 stub (public/js/onesignal.js);
-// Task 25 will replace the stub with the real SDK flow.
+// OneSignal integration lives in public/js/onesignal.js. Task 25
+// replaced the Task 12 stub with the real Web SDK v16 flow behind the
+// same module interface, so this view talks to the same three exports
+// (getSubscriptionState, requestPermissionAndSubscribe, addPermissionListener)
+// as before.
 "use strict";
 
 import { initFirestore, onSnapshot } from "../firebase.js";
@@ -39,6 +42,7 @@ import { renderMarkdown } from "../markdown-mini.js";
 import {
   getSubscriptionState,
   requestPermissionAndSubscribe,
+  addPermissionListener,
 } from "../onesignal.js";
 
 const DECISION_KEY = "vendorday2027.push.decision";
@@ -89,6 +93,17 @@ export async function renderAnnouncements(host, opts = {}) {
   // slot to reflect the next state (e.g., hide after grant/deny/dismiss).
   renderOptInSlot(optInSlot, deniedSlot).catch((err) => {
     console.warn("[announcements] opt-in render failed:", err);
+  });
+
+  // Re-render the opt-in / denied banner when the OneSignal permission
+  // state changes outside the view (e.g., the user granted permission
+  // on another device, or revoked OS-level permission and returned to
+  // the app). The listener is torn down in __cleanup below so background
+  // callbacks don't fire against a stale host after navigation.
+  const unsubscribePerm = addPermissionListener(() => {
+    renderOptInSlot(optInSlot, deniedSlot).catch((err) =>
+      console.warn("[announcements] opt-in rerender from permission change failed:", err),
+    );
   });
 
   // Prime Firestore config; onSnapshot waits for it on the first tick.
@@ -235,6 +250,7 @@ export async function renderAnnouncements(host, opts = {}) {
 
   __cleanup = () => {
     if (unsub) { unsub(); unsub = null; }
+    try { unsubscribePerm(); } catch (_err) { /* no-op */ }
   };
   registerViewCleanup(() => runCleanup());
 

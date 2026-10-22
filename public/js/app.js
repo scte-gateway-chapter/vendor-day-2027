@@ -25,6 +25,12 @@ import { renderAttendees } from "./views/attendees.js";
 import { renderAttendeeDetail } from "./views/attendees-detail.js";
 import { renderFeedback } from "./views/feedback.js";
 import { renderRecap } from "./views/recap.js";
+import {
+  initOneSignal,
+  getSubscriptionState,
+  requestPermissionAndSubscribe,
+  addPermissionListener,
+} from "./onesignal.js";
 
 /** Persistent flag — once the user taps "I'll do this later" we skip Welcome
  *  for every subsequent visit on this device. Cleared only by the user via
@@ -241,6 +247,100 @@ async function renderAboutInstall() {
     }
 
     root.append(install);
+
+    // Notifications section (Task 25). Mounts a state-dependent control
+    // (Enable button, or a muted status line) and re-renders when the
+    // user's choice resolves or the OS-level permission changes while
+    // the view is mounted. The section lives at the bottom so the event
+    // + install content stays the primary read.
+    const notifications = document.createElement("section");
+    notifications.className = "card";
+    notifications.setAttribute("aria-live", "polite");
+    notifications.innerHTML = `<h2>Notifications</h2><div data-notifications-body></div>`;
+    root.append(notifications);
+
+    const body = notifications.querySelector("[data-notifications-body]");
+    let rerenderInFlight = false;
+
+    async function renderNotificationsBody() {
+      // Guard against overlapping async renders from the listener + the
+      // button handler racing each other.
+      if (rerenderInFlight) return;
+      rerenderInFlight = true;
+      try {
+        const state = await getSubscriptionState();
+        body.innerHTML = "";
+        if (state === "granted") {
+          const p = document.createElement("p");
+          p.textContent = "Notifications are enabled.";
+          const note = document.createElement("p");
+          note.textContent =
+            "To stop receiving them, change notification settings in your device.";
+          body.append(p, note);
+        } else if (state === "denied") {
+          const p = document.createElement("p");
+          p.textContent = "Notifications are turned off.";
+          const note = document.createElement("p");
+          note.textContent =
+            "To re-enable, change notification settings in your device. We cannot re-prompt from the app.";
+          body.append(p, note);
+        } else if (state === "ios-install-required") {
+          const p = document.createElement("p");
+          p.textContent =
+            "Install this app to your home screen first to enable notifications.";
+          const note = document.createElement("p");
+          note.textContent =
+            "Follow the Add to Home Screen steps above, then launch from the home-screen icon.";
+          body.append(p, note);
+        } else if (state === "unsupported") {
+          const p = document.createElement("p");
+          p.textContent = "Notifications aren't available in this browser.";
+          body.append(p);
+        } else {
+          // state === "not-prompted"
+          const p = document.createElement("p");
+          p.textContent =
+            "Get notified about schedule changes and announcements.";
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "btn-primary";
+          btn.textContent = "Enable notifications";
+          btn.addEventListener("click", async () => {
+            btn.disabled = true;
+            try {
+              const result = await requestPermissionAndSubscribe();
+              if (result === "granted") {
+                ui.toast("success", "Notifications enabled.");
+              } else if (result === "unsupported") {
+                ui.toast(
+                  "info",
+                  "Notifications aren't available in this browser.",
+                );
+              }
+            } catch (err) {
+              console.warn("[about-install] enable notifications failed:", err);
+              ui.toast("error", "Couldn't enable notifications. Try again.");
+            } finally {
+              btn.disabled = false;
+              renderNotificationsBody();
+            }
+          });
+          body.append(p, btn);
+        }
+      } finally {
+        rerenderInFlight = false;
+      }
+    }
+
+    // Register a permission listener so the section updates if the user
+    // toggles permission in device settings and returns to this view.
+    const unsubscribe = addPermissionListener(() => renderNotificationsBody());
+    registerViewCleanup(() => {
+      try { unsubscribe(); } catch (_err) { /* no-op */ }
+    });
+
+    renderNotificationsBody();
+
     document.title = "About & Install \u2014 Vendor Day 2027";
   });
 }
@@ -361,6 +461,21 @@ async function main() {
       { durationMs: 6000 },
     );
   });
+
+  // Kick off the OneSignal SDK load on window.load so a slow CDN never
+  // blocks first paint. The call is idempotent — any view that awaits
+  // getSubscriptionState() will reuse the in-flight promise.
+  if (document.readyState === "complete") {
+    initOneSignal().catch((err) => console.warn("[app] initOneSignal failed:", err));
+  } else {
+    window.addEventListener(
+      "load",
+      () => {
+        initOneSignal().catch((err) => console.warn("[app] initOneSignal failed:", err));
+      },
+      { once: true },
+    );
+  }
 
   // App-lifetime poll driving the More menu's Recap entry visibility.
   // Runs for the whole session (not registered with view cleanup) so the
