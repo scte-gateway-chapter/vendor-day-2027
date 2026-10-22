@@ -21,6 +21,7 @@ import renderSponsorsEditor from "./sponsors-editor.js";
 import renderMapUploader from "./map-uploader.js";
 import renderAnnouncementsComposer from "./announcements-composer.js";
 import renderAttendeesImporter from "./attendees-importer.js";
+import renderFeedbackEditor from "./feedback-editor.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
@@ -37,7 +38,7 @@ const PROTECTED_ROUTES = [
   { slug: "map", label: "Admin Venue Map", taskLabel: "Task 20" },
   { slug: "announcements", label: "Admin Announcements", taskLabel: "Task 21" },
   { slug: "attendees", label: "Admin Attendees", taskLabel: "Task 22" },
-  { slug: "feedback", label: "Admin Feedback", taskLabel: "Task 23" },
+  { slug: "feedback", label: "Admin Feedback", taskLabel: "Task 23" }, // replaced by renderFeedbackEditor below
   { slug: "recap", label: "Admin Recap", taskLabel: "Task 24" },
   { slug: "settings", label: "Admin Settings", taskLabel: "a later task" },
 ];
@@ -201,6 +202,21 @@ function handleAttendeesRoute() {
   syncPhoneDropdown("attendees");
 }
 
+function handleFeedbackRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderFeedbackEditor(host).catch((err) => {
+      console.warn("[admin] feedback editor render failed:", err);
+    });
+  }
+  syncPhoneDropdown("feedback");
+}
+
 function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
@@ -229,6 +245,7 @@ function registerRoutes() {
   router.register("#/map", handleMapRoute);
   router.register("#/announcements", handleAnnouncementsRoute);
   router.register("#/attendees", handleAttendeesRoute);
+  router.register("#/feedback", handleFeedbackRoute);
   for (const route of PROTECTED_ROUTES) {
     if (
       route.slug === "dashboard" ||
@@ -236,7 +253,8 @@ function registerRoutes() {
       route.slug === "sponsors" ||
       route.slug === "map" ||
       route.slug === "announcements" ||
-      route.slug === "attendees"
+      route.slug === "attendees" ||
+      route.slug === "feedback"
     ) continue;
     router.register(`#/${route.slug}`, () =>
       handleProtectedRoute(route.slug, route.label, route.taskLabel),
