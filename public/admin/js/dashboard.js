@@ -291,8 +291,8 @@ function renderCardLoaded(el, spec, { statusText, metaDoc }) {
       <h3 class="admin-card__title" id="${titleId}">${escapeHtml(spec.title)}</h3>
       <p class="admin-card__status">${escapeHtml(statusText)}</p>
       <p class="admin-card__meta">${escapeHtml(meta)}</p>
+      <span class="btn-secondary admin-card__action" aria-hidden="true">Edit\u2026</span>
     </a>
-    <span class="btn-secondary admin-card__action" aria-hidden="true">Edit\u2026</span>
   `;
 }
 
