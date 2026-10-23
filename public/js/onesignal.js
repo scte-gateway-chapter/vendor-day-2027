@@ -154,10 +154,13 @@ export async function initOneSignal() {
         try {
           await OneSignal.init({
             appId: appIdCached,
-            // Our custom worker lives at /OneSignalSDKWorker.js (root-scoped);
-            // the SDK's default also points there, but we set it explicitly
-            // for clarity in case the SDK's default changes in a future minor.
-            serviceWorkerPath: "OneSignalSDKWorker.js",
+            // Our main service worker (/sw.js) also runs OneSignal's push
+            // handling code via `importScripts` at the top of that file.
+            // Pointing OneSignal at /sw.js here (instead of registering a
+            // second worker at /OneSignalSDKWorker.js) avoids a scope
+            // conflict with our main worker that was silently dropping
+            // push events.
+            serviceWorkerPath: "sw.js",
             serviceWorkerParam: { scope: "/" },
             notifyButton: { enable: false }, // We render our own opt-in UI.
             allowLocalhostAsSecureOrigin: true, // Dev convenience; harmless in prod.

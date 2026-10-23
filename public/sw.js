@@ -5,6 +5,15 @@
 // in Task 26 — this file exists today so the attendee shell registers a
 // service worker on first deploy and the production URL demonstrates the
 // PWA plumbing works end-to-end.
+//
+// We also importScripts OneSignal's hosted service worker code at the
+// TOP of this file. This is OneSignal's recommended pattern when the
+// site has its own service worker: use a single worker file (ours) that
+// also runs OneSignal's push handling, instead of registering OneSignal's
+// separate worker at the same scope — which would conflict and cause
+// push events to silently drop. See `onesignal.js` for the matching
+// `serviceWorkerPath` config that points OneSignal at this file.
+importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
 
 const SHELL_CACHE = "shell-v1792703591406";
 const CONTENT_CACHE = "content-v1792703591406";
