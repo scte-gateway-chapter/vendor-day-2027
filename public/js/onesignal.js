@@ -284,34 +284,16 @@ export async function requestPermissionAndSubscribe() {
 
   // state === "not-prompted".
   //
-  // Call the native Notification.requestPermission() FIRST. On iOS 16.4+
-  // standalone PWAs this is the most reliable path: it fires the OS prompt
-  // synchronously enough to preserve the user-gesture context, and on
-  // Android Chrome it works identically. Routing through the OneSignal
-  // SDK's wrapper after an async init has been observed to lose the
-  // gesture context on iOS, leaving the prompt invisible and the caller
-  // hanging. We let the SDK pick up the subscription asynchronously
-  // afterward if init completes within a short budget.
-  if (typeof Notification === "undefined" || typeof Notification.requestPermission !== "function") {
-    return "unsupported";
-  }
-
-  let nativeResult;
-  try {
-    // Normalize the two historical call shapes (callback vs. Promise).
-    nativeResult = await Promise.resolve(Notification.requestPermission());
-  } catch (err) {
-    console.warn("[onesignal] native requestPermission failed:", err);
-    return "denied";
-  }
-
-  if (nativeResult === "denied") return "denied";
-  if (nativeResult !== "granted") return "default";
-
-  // Permission granted. Kick SDK init if it has not started, and give it
-  // up to 5 seconds to settle so the subscription registers. If it does
-  // not settle in time, the SDK will pick it up on the next page load;
-  // the UI returns "granted" either way since the OS permission is set.
+  // Prefer OneSignal's `OneSignal.Notifications.requestPermission()`. On
+  // iOS 16.4+ standalone PWAs, splitting the OS prompt and the push
+  // subscription registration across two separate calls (native
+  // Notification.requestPermission() + a later OneSignal.optIn()) loses
+  // the user-gesture context between the two, so Apple accepts the OS
+  // permission grant but OneSignal never actually registers a working
+  // push endpoint. OneSignal's own method combines both steps into one
+  // gesture-preserving call, which is what iOS requires. We await SDK
+  // readiness first (init is kicked off by app.js on window.load, so it
+  // should already be settled by the time the user taps Enable).
   if (!sdkReady) initOneSignal();
   try {
     await Promise.race([
@@ -321,25 +303,39 @@ export async function requestPermissionAndSubscribe() {
       ),
     ]);
   } catch (_err) {
-    /* non-fatal — permission is already granted */
+    /* non-fatal; try the native fallback below */
   }
 
-  // When we bypass OneSignal's native prompt in favor of
-  // Notification.requestPermission() (to preserve the user-gesture
-  // context on iOS), the SDK does not automatically register the device
-  // as a subscription — the auto-register flow is tied to its own
-  // prompt. Explicitly opt in now so OneSignal records the device as a
-  // deliverable subscription. Without this call, OneSignal has OS
-  // permission but no subscription record and will deliver zero pushes.
-  if (oneSignalNS && oneSignalNS.User && oneSignalNS.User.PushSubscription) {
+  if (
+    !sdkUnavailable &&
+    oneSignalNS &&
+    oneSignalNS.Notifications &&
+    typeof oneSignalNS.Notifications.requestPermission === "function"
+  ) {
     try {
-      await oneSignalNS.User.PushSubscription.optIn();
+      await oneSignalNS.Notifications.requestPermission();
     } catch (err) {
-      console.warn("[onesignal] PushSubscription.optIn failed:", err);
+      console.warn("[onesignal] SDK requestPermission failed:", err);
     }
+    return await getSubscriptionState();
   }
 
-  return await getSubscriptionState();
+  // SDK unavailable (deploy misconfig or script failed to load). Fall
+  // back to the native prompt so the UI still has a definitive outcome,
+  // even though the subscription won't register on OneSignal's side.
+  if (typeof Notification === "undefined" || typeof Notification.requestPermission !== "function") {
+    return "unsupported";
+  }
+  try {
+    const result = await Promise.resolve(Notification.requestPermission());
+    if (result === "granted" || result === "denied" || result === "default") {
+      return result;
+    }
+    return "default";
+  } catch (err) {
+    console.warn("[onesignal] native requestPermission fallback failed:", err);
+    return "denied";
+  }
 }
 
 /* ---------------- Listeners ---------------- */
