@@ -374,11 +374,21 @@ function render404() {
 
 function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
-  navigator.serviceWorker.register("/sw.js").catch((err) => {
-    console.warn("Service worker registration failed:", err);
-  });
+  // Register on window.load so the attendee shell's first paint is not
+  // blocked by the SW install step. The /sw.js file ships OneSignal's
+  // push handler via importScripts, so this registration also wires up
+  // push delivery for the installed PWA (see onesignal.js).
+  const start = () => {
+    navigator.serviceWorker.register("/sw.js").catch((err) => {
+      console.warn("Service worker registration failed:", err);
+    });
+  };
+  if (document.readyState === "complete") start();
+  else window.addEventListener("load", start, { once: true });
+
   navigator.serviceWorker.addEventListener("message", (ev) => {
-    if (ev?.data?.type === "NEW_VERSION_ACTIVATED") {
+    const data = ev && ev.data;
+    if (data && data.type === "sw-updated") {
       ui.showUpdateReadyBanner();
     }
   });

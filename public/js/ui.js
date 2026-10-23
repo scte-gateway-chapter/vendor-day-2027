@@ -295,8 +295,11 @@ export function hideOfflineBanner() {
 }
 
 /**
- * Show the "App updated — tap to reload" banner. Clicking it reloads. The SW
- * fires a `message` event that triggers this on new-version activation.
+ * Show the "App updated — tap to reload" banner. The SW fires a `sw-updated`
+ * message after activation and app.js calls this. Clicking the banner
+ * posts a `skip-waiting` message to the waiting SW (defense-in-depth —
+ * the install-time `skipWaiting()` usually already fired by now) and then
+ * reloads so the new shell takes effect.
  */
 export function showUpdateReadyBanner() {
   const root = bannerRoot();
@@ -306,6 +309,18 @@ export function showUpdateReadyBanner() {
   btn.className = "update-ready-banner";
   btn.setAttribute("aria-live", "polite");
   btn.innerHTML = "App updated \u2014 tap to reload";
-  btn.addEventListener("click", () => window.location.reload());
+  btn.addEventListener("click", async () => {
+    try {
+      if ("serviceWorker" in navigator) {
+        const reg = await navigator.serviceWorker.getRegistration();
+        const waiting = reg && reg.waiting;
+        if (waiting) waiting.postMessage({ type: "skip-waiting" });
+      }
+    } catch (err) {
+      console.warn("[ui] skip-waiting post failed:", err);
+    } finally {
+      window.location.reload();
+    }
+  });
   root.appendChild(btn);
 }
