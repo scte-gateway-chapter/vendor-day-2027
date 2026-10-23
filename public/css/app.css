@@ -140,7 +140,18 @@ a:focus-visible {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: var(--space-sm) var(--space-md);
+  /* iOS Safari in installed-PWA mode with
+     `apple-mobile-web-app-status-bar-style: black-translucent` paints
+     content under the status bar / notch / Dynamic Island. Pad the top
+     by `env(safe-area-inset-top)` so the logo and menu don't collide
+     with the clock, battery, and signal indicators. On devices without
+     a safe area (desktop PWA, Android Chrome in standalone), the value
+     is 0 and the header looks identical to before. */
+  padding:
+    calc(var(--space-sm) + env(safe-area-inset-top, 0px))
+    calc(var(--space-md) + env(safe-area-inset-right, 0px))
+    var(--space-sm)
+    calc(var(--space-md) + env(safe-area-inset-left, 0px));
   background: var(--surface);
   border-bottom: 1px solid var(--border-neutral);
   min-height: var(--header-height);
