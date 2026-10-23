@@ -24,6 +24,13 @@ self.addEventListener("activate", (event) => {
 });
 
 self.addEventListener("fetch", (event) => {
-  // Intentionally empty — tiered caching (cache-first shell, network-first
-  // content, cache-first images) is implemented in Task 26.
+  // Minimal "I am a real service worker" implementation until the
+  // tiered caching strategy lands in Task 26. iOS 16.4+ requires the
+  // fetch handler to actually call event.respondWith() for the site to
+  // be classified as a PWA (not a bookmark); an empty listener fails
+  // that check and installing to home screen produces a bookmark that
+  // can't receive push notifications. This pass-through just delegates
+  // to the network, which is identical functionally to not having a SW
+  // but satisfies iOS's PWA eligibility probe.
+  event.respondWith(fetch(event.request));
 });
