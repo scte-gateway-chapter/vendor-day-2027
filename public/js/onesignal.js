@@ -238,20 +238,28 @@ export async function getSubscriptionState() {
   if (perm === "denied") return "denied";
   if (perm === "default") return "not-prompted";
 
-  // perm === "granted" — we need the SDK to know whether the device is
-  // actually subscribed. Await init; if it fails, fall back to the
-  // conservative "not-prompted" so the UI nudges the user to re-enable.
+  // perm === "granted" — the OS has granted notification permission.
+  // Try to confirm with OneSignal that the subscription is also
+  // registered, but if the SDK is unavailable (offline, blocked, slow
+  // CDN), trust the OS-level grant rather than downgrading to
+  // "not-prompted". Downgrading would show the Enable button when the
+  // user already has notifications on, which is confusing and would
+  // let them re-trigger a prompt the browser won't display anyway.
   try {
     await sdkReady;
   } catch (_err) {
-    /* non-fatal; falls through */
+    /* non-fatal; falls through to the grant-trusting return below */
   }
-  if (sdkUnavailable || !oneSignalNS) return "not-prompted";
+  if (sdkUnavailable || !oneSignalNS) return "granted";
   try {
     const sub = oneSignalNS.User && oneSignalNS.User.PushSubscription;
-    return sub && sub.optedIn === true ? "granted" : "not-prompted";
+    // Only downgrade to "not-prompted" if we have definitive SDK
+    // evidence that the subscription wasn't actually registered.
+    // Otherwise the OS grant is sufficient.
+    if (sub && sub.optedIn === false) return "not-prompted";
+    return "granted";
   } catch (_err) {
-    return "not-prompted";
+    return "granted";
   }
 }
 
