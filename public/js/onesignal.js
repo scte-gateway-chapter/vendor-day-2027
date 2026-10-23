@@ -323,6 +323,22 @@ export async function requestPermissionAndSubscribe() {
   } catch (_err) {
     /* non-fatal — permission is already granted */
   }
+
+  // When we bypass OneSignal's native prompt in favor of
+  // Notification.requestPermission() (to preserve the user-gesture
+  // context on iOS), the SDK does not automatically register the device
+  // as a subscription — the auto-register flow is tied to its own
+  // prompt. Explicitly opt in now so OneSignal records the device as a
+  // deliverable subscription. Without this call, OneSignal has OS
+  // permission but no subscription record and will deliver zero pushes.
+  if (oneSignalNS && oneSignalNS.User && oneSignalNS.User.PushSubscription) {
+    try {
+      await oneSignalNS.User.PushSubscription.optIn();
+    } catch (err) {
+      console.warn("[onesignal] PushSubscription.optIn failed:", err);
+    }
+  }
+
   return await getSubscriptionState();
 }
 

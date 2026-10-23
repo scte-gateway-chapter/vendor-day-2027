@@ -21,10 +21,13 @@ import {
 // endpoint.
 const ONESIGNAL_BASE = "https://api.onesignal.com";
 
-// Current segment name per OneSignal docs. Older OneSignal docs targeted the
-// built-in segment `All`; `Subscribed Users` is the maintained name for new
-// apps and is what the OneSignal dashboard creates for a fresh Web app.
-const DEFAULT_SEGMENT = "Subscribed Users";
+// OneSignal's built-in "all subscribers" segment has had three different
+// labels across their app generations: legacy "All", current "Subscribed
+// Users" for Web apps, and "Total Subscriptions" for apps provisioned via
+// their 2024+ onboarding. OneSignal's REST API ignores segment names it
+// doesn't recognize, so listing all three guarantees the push lands on
+// whatever the current OneSignal account actually has provisioned.
+const DEFAULT_SEGMENTS = ["Subscribed Users", "All", "Total Subscriptions"];
 
 const APP_PUBLIC_ORIGIN = "https://2027vendorday.gatewayscte.org";
 
@@ -183,7 +186,7 @@ async function sendPush(env, request, cors, authPayload) {
   // chapter rotates to a newer-style key.
   const notification = {
     app_id: appId,
-    included_segments: [DEFAULT_SEGMENT],
+    included_segments: DEFAULT_SEGMENTS,
     headings: { en: title },
     contents: { en: bodyPreview },
     url,
