@@ -5,6 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>SCTE Gateway Chapter Vendor Day 2027</title>
     <meta name="theme-color" content="#2E8B57" />
+    <!--
+      iOS-specific PWA recognition tags. Without `apple-mobile-web-app-capable`,
+      iOS 16.4+ Safari treats "Add to Home Screen" as a bookmark (opens in a
+      Safari tab) instead of a standalone PWA. Bookmarks can NOT receive web
+      push notifications on iOS — only installed-PWA mode can.
+      `apple-mobile-web-app-status-bar-style` controls the status bar
+      appearance in standalone mode; `black-translucent` lets the app paint
+      under the status bar.
+    -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Vendor Day 2027" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="apple-touch-icon" href="/assets/icons/icon-192.png" />
     <link rel="stylesheet" href="/css/app.css" />
