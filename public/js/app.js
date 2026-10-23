@@ -386,11 +386,32 @@ function registerServiceWorker() {
   if (document.readyState === "complete") start();
   else window.addEventListener("load", start, { once: true });
 
+  // iOS Safari fires the service worker's `activate` event on every PWA
+  // launch, not only when a new SW version actually replaces the old one.
+  // The SW posts `{ type: "sw-updated", buildId }` on each activate, so
+  // we must gate the banner on an actual build-id change — otherwise
+  // every launch flashes the update prompt.
+  const LAST_SEEN_BUILD_KEY = "vendorday2027.lastSeenBuildId";
   navigator.serviceWorker.addEventListener("message", (ev) => {
     const data = ev && ev.data;
-    if (data && data.type === "sw-updated") {
-      ui.showUpdateReadyBanner();
+    if (!data || data.type !== "sw-updated") return;
+    const incoming = typeof data.buildId === "string" ? data.buildId : "";
+    if (!incoming) return;
+    let lastKnown = "";
+    try { lastKnown = localStorage.getItem(LAST_SEEN_BUILD_KEY) || ""; } catch (_err) { /* no-op */ }
+    if (!lastKnown) {
+      // First activation this device has seen — not a user-facing update.
+      try { localStorage.setItem(LAST_SEEN_BUILD_KEY, incoming); } catch (_err) { /* no-op */ }
+      return;
     }
+    if (incoming === lastKnown) {
+      // Same build id — iOS re-firing activate on launch. Silent.
+      return;
+    }
+    // Genuinely new build. Record the id now so subsequent activates on
+    // the same build don't re-show the banner, then surface it.
+    try { localStorage.setItem(LAST_SEEN_BUILD_KEY, incoming); } catch (_err) { /* no-op */ }
+    ui.showUpdateReadyBanner();
   });
 }
 
