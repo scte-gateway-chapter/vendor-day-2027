@@ -22,6 +22,12 @@
     <link rel="stylesheet" href="/css/app.css" />
   </head>
   <body>
+    <!--
+      Skip link: WCAG 2.4.1 Bypass Blocks. First focusable element on the
+      page so screen reader + keyboard users can jump past the header /
+      sticky overflow menu into the view. Hidden offscreen until focused.
+    -->
+    <a class="skip-link" href="#view-root">Skip to content</a>
     <div id="app">
       <header id="app-header"></header>
       <main id="view-root" tabindex="-1"></main>

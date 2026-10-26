@@ -89,7 +89,10 @@ export default renderAgendaDetail;
 function buildBackHeader() {
   const el = document.createElement("header");
   el.className = "agenda-sticky-header agenda-sticky-header--detail";
-  el.setAttribute("role", "banner");
+  // No ARIA role: the shell <header id="app-header"> already carries
+  // role="banner" and the Lighthouse "landmark-no-duplicate-banner" rule
+  // flags more than one. A <header> nested inside <main> has no implicit
+  // landmark role, which is what we want for a view-level section header.
   el.innerHTML = `
     <button type="button" class="agenda-back" data-back aria-label="Back to Agenda">
       <span aria-hidden="true">\u2190</span>

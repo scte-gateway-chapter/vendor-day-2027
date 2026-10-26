@@ -83,7 +83,9 @@ export default renderSponsorDetail;
 function buildBackHeader() {
   const el = document.createElement("header");
   el.className = "view-sticky-header view-sticky-header--detail";
-  el.setAttribute("role", "banner");
+  // No ARIA role: the shell <header id="app-header"> is the sole
+  // page-level banner. A duplicate banner landmark fails Lighthouse's
+  // "landmark-no-duplicate-banner" rule.
   el.innerHTML = `
     <button type="button" class="view-back-button" data-back aria-label="Back to Sponsors">
       <span aria-hidden="true">\u2190</span>

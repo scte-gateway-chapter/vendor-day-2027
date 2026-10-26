@@ -11,6 +11,12 @@
     <link rel="stylesheet" href="/admin/css/admin.css" />
   </head>
   <body class="admin-body">
+    <!--
+      Skip link: WCAG 2.4.1 Bypass Blocks. First focusable element so
+      keyboard users can skip past the header + left rail / phone nav
+      dropdown and land in the editor view. Hidden offscreen until focused.
+    -->
+    <a class="skip-link" href="#admin-view-root">Skip to content</a>
     <header class="app-header admin-header" role="banner">
       <img
         class="app-header__logo"
@@ -18,10 +24,17 @@
         alt="Gateway Chapter SCTE"
         height="32"
       />
-      <h1 class="app-header__title">
+      <!--
+        The visual site-title "Vendor Day 2027" is intentionally a <p>, not
+        an <h1>. Each admin view renders its own <h1> inside #admin-view-root
+        (either visibly via the sticky editor header or via an sr-only
+        heading injected by admin.js), so the page outline reads with a
+        single, view-specific h1 per route.
+      -->
+      <p class="app-header__title">
         Vendor Day 2027
         <span class="admin-badge" aria-label="Admin area">Admin</span>
-      </h1>
+      </p>
       <button type="button" id="admin-logout-btn" class="admin-header__logout" aria-label="Log out">Log out</button>
     </header>
 

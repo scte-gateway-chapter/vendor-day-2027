@@ -90,7 +90,11 @@ export async function renderAttendees(host) {
 
   const stickyHeader = document.createElement("header");
   stickyHeader.className = "view-sticky-header";
-  stickyHeader.setAttribute("role", "banner");
+  // No ARIA role here — the shell <header id="app-header"> is the single
+  // page-level banner. A second role="banner" would fail Lighthouse's
+  // "landmark-no-duplicate-banner" rule. A <header> element nested inside
+  // <main> has no implicit landmark role, which is the correct semantics
+  // for this view-level section header.
   stickyHeader.innerHTML = `
     <h2 class="view-sticky-header__title">Attendees</h2>
     <span class="attendee-count-live" data-count aria-live="polite" aria-atomic="true"></span>

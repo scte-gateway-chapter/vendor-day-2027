@@ -112,6 +112,40 @@ a:focus-visible {
   border: 0;
 }
 
+/* ---------- Skip link ----------
+   WCAG 2.4.1 (Bypass Blocks): the first focusable element on every page
+   is a "Skip to content" anchor that targets #view-root (attendee shell)
+   or #admin-view-root (admin shell). The anchor is offscreen until it
+   receives keyboard focus, then it slides into view with a brand-green
+   pill. Clicking or activating moves focus to the main region. */
+.skip-link {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 100;
+  padding: var(--space-sm) var(--space-md);
+  background: var(--brand-green);
+  color: #FFF;
+  font-weight: 600;
+  text-decoration: none;
+  border-radius: 0 0 var(--radius) 0;
+  box-shadow: var(--shadow-md);
+  /* Visually hide until focused — but keep clickable so screen readers can
+     activate it. clip-path leaves it in the accessibility tree while
+     keeping its on-screen footprint at a single pixel. */
+  transform: translateY(-200%);
+  transition: transform 160ms ease-out;
+}
+.skip-link:focus,
+.skip-link:focus-visible {
+  transform: translateY(0);
+  outline: 2px solid #FFF;
+  outline-offset: -4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skip-link { transition: none; }
+}
+
 /* ---------- Shell layout ---------- */
 
 #app {
@@ -239,14 +273,22 @@ a:focus-visible {
   justify-content: center;
   min-width: 44px;
   min-height: 44px;
+  /* 2px of inner space reserved so the active-tab top border (added
+     below) doesn't push the label down and shift the baseline. */
+  border-top: 2px solid transparent;
   color: var(--secondary-text);
   font-size: var(--font-size-sm);
   line-height: 1.2;
 }
 
+/* Active-tab styling pairs a color change with a 2px top border so
+   colorblind users see the selection without relying on hue alone
+   (WCAG 1.4.1 "Use of Color"). The border color matches the body's
+   active-tab text color so the two signals read as a single accent. */
 .tab-bar__button[aria-selected="true"] {
   color: var(--brand-green-text);
   font-weight: 600;
+  border-top-color: var(--brand-green);
 }
 
 .tab-bar__label { display: block; }

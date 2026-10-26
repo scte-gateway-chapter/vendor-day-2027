@@ -159,7 +159,9 @@ function runCleanup() {
 function buildStickyHeader() {
   const el = document.createElement("header");
   el.className = "view-sticky-header";
-  el.setAttribute("role", "banner");
+  // No ARIA role: the shell <header id="app-header"> is the single
+  // page-level banner. A duplicate banner landmark fails Lighthouse's
+  // "landmark-no-duplicate-banner" rule.
   el.innerHTML = `<h2 class="view-sticky-header__title">Recap</h2>`;
   return el;
 }

@@ -13,6 +13,7 @@
 "use strict";
 
 import * as router from "/js/router.js";
+import { injectViewHeading } from "/js/ui.js";
 import { isAdminAuthenticated, clearAdminSession } from "./admin-auth.js";
 import renderAdminLogin from "./login.js";
 import renderAdminDashboard from "./dashboard.js";
@@ -78,6 +79,24 @@ function viewHost() {
   return document.getElementById("admin-view-root");
 }
 
+/**
+ * Inject an sr-only `<h1>` sourced from `document.title` into the admin
+ * view host, matching the attendee shell's showView() behavior. The admin
+ * app-header carries a `<p>` (not an `<h1>`) so the sr-only heading is
+ * the page's single h1 for screen reader navigation. No-op when the
+ * current view already rendered its own `<h1>` (e.g., login.js).
+ *
+ * The call is deferred to a microtask so async editor renderers (which
+ * typically set `document.title` late in their render path) have a tick
+ * to settle their title before we read it.
+ */
+function injectAdminHeadingSoon() {
+  queueMicrotask(() => {
+    const host = viewHost();
+    if (host) injectViewHeading(host);
+  });
+}
+
 function setAuthShell(authenticated) {
   document.body.classList.toggle(UNAUTH_CLASS, !authenticated);
 }
@@ -111,6 +130,9 @@ function handleRootRoute() {
   if (host) renderAdminLogin(host);
   document.title = "Admin sign in \u2014 Vendor Day 2027";
   syncPhoneDropdown(null);
+  // Login already renders its own visible <h1>; injectViewHeading() is
+  // a no-op in that case, so calling it is safe + consistent.
+  injectAdminHeadingSoon();
 }
 
 function handleDashboardRoute() {
@@ -121,9 +143,11 @@ function handleDashboardRoute() {
   setAuthShell(true);
   const host = viewHost();
   if (host) {
-    renderAdminDashboard(host).catch((err) => {
-      console.warn("[admin] dashboard render failed:", err);
-    });
+    renderAdminDashboard(host)
+      .catch((err) => {
+        console.warn("[admin] dashboard render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
   }
   syncPhoneDropdown("dashboard");
 }
@@ -136,9 +160,11 @@ function handleAgendaRoute() {
   setAuthShell(true);
   const host = viewHost();
   if (host) {
-    renderAgendaEditor(host).catch((err) => {
-      console.warn("[admin] agenda editor render failed:", err);
-    });
+    renderAgendaEditor(host)
+      .catch((err) => {
+        console.warn("[admin] agenda editor render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
   }
   syncPhoneDropdown("agenda");
 }
@@ -151,9 +177,11 @@ function handleSponsorsRoute() {
   setAuthShell(true);
   const host = viewHost();
   if (host) {
-    renderSponsorsEditor(host).catch((err) => {
-      console.warn("[admin] sponsors editor render failed:", err);
-    });
+    renderSponsorsEditor(host)
+      .catch((err) => {
+        console.warn("[admin] sponsors editor render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
   }
   syncPhoneDropdown("sponsors");
 }
@@ -166,9 +194,11 @@ function handleMapRoute() {
   setAuthShell(true);
   const host = viewHost();
   if (host) {
-    renderMapUploader(host).catch((err) => {
-      console.warn("[admin] map uploader render failed:", err);
-    });
+    renderMapUploader(host)
+      .catch((err) => {
+        console.warn("[admin] map uploader render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
   }
   syncPhoneDropdown("map");
 }
@@ -181,9 +211,11 @@ function handleAnnouncementsRoute() {
   setAuthShell(true);
   const host = viewHost();
   if (host) {
-    renderAnnouncementsComposer(host).catch((err) => {
-      console.warn("[admin] announcements composer render failed:", err);
-    });
+    renderAnnouncementsComposer(host)
+      .catch((err) => {
+        console.warn("[admin] announcements composer render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
   }
   syncPhoneDropdown("announcements");
 }
@@ -196,9 +228,11 @@ function handleAttendeesRoute() {
   setAuthShell(true);
   const host = viewHost();
   if (host) {
-    renderAttendeesImporter(host).catch((err) => {
-      console.warn("[admin] attendees importer render failed:", err);
-    });
+    renderAttendeesImporter(host)
+      .catch((err) => {
+        console.warn("[admin] attendees importer render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
   }
   syncPhoneDropdown("attendees");
 }
@@ -211,9 +245,11 @@ function handleFeedbackRoute() {
   setAuthShell(true);
   const host = viewHost();
   if (host) {
-    renderFeedbackEditor(host).catch((err) => {
-      console.warn("[admin] feedback editor render failed:", err);
-    });
+    renderFeedbackEditor(host)
+      .catch((err) => {
+        console.warn("[admin] feedback editor render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
   }
   syncPhoneDropdown("feedback");
 }
@@ -226,9 +262,11 @@ function handleRecapRoute() {
   setAuthShell(true);
   const host = viewHost();
   if (host) {
-    renderRecapEditor(host).catch((err) => {
-      console.warn("[admin] recap editor render failed:", err);
-    });
+    renderRecapEditor(host)
+      .catch((err) => {
+        console.warn("[admin] recap editor render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
   }
   syncPhoneDropdown("recap");
 }
@@ -243,6 +281,7 @@ function handleProtectedRoute(slug, label, taskLabel) {
   setAuthShell(true);
   renderPlaceholder(label, taskLabel);
   syncPhoneDropdown(slug);
+  injectAdminHeadingSoon();
 }
 
 function handleLogoutRoute() {

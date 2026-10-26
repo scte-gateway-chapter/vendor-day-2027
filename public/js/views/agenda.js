@@ -159,7 +159,10 @@ function runCleanup() {
 function buildStickyHeader() {
   const el = document.createElement("header");
   el.className = "agenda-sticky-header";
-  el.setAttribute("role", "banner");
+  // No ARIA role: the shell <header id="app-header"> already carries
+  // role="banner"; a second banner landmark on the page would fail
+  // Lighthouse's "landmark-no-duplicate-banner" rule. A <header>
+  // nested inside <main> carries no implicit landmark role.
   el.innerHTML = `<h2 class="agenda-sticky-header__title">Agenda</h2>`;
 
   async function load(configReady) {

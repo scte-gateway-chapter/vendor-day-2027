@@ -2512,6 +2512,10 @@ body.admin-modal-open {
   opacity: 0.5;
   cursor: not-allowed;
 }
+@media (prefers-reduced-motion: reduce) {
+  .admin-feedback-toggle__track,
+  .admin-feedback-toggle__thumb { transition: none; }
+}
 .admin-feedback-toggle__copy {
   display: flex;
   flex-direction: column;
@@ -2772,6 +2776,9 @@ body.admin-modal-open {
   border-radius: var(--radius);
   min-width: 0;
   transition: width 0.2s ease;
+}
+@media (prefers-reduced-motion: reduce) {
+  .admin-rating-bar { transition: none; }
 }
 .admin-rating-bar__count {
   min-width: 2.5rem;

@@ -32,6 +32,11 @@ export function renderHeader() {
   if (!mount) return;
   mount.className = "app-header";
   mount.setAttribute("role", "banner");
+  // Note: the visual site title "Vendor Day 2027" is intentionally a
+  // <p>, not an <h1>. Each view injects its own sr-only <h1> inside
+  // #view-root (via showView() below) so the page outline carries a
+  // single, view-specific h1 per route — matching design section 11's
+  // landmark structure and keeping Lighthouse's heading audit clean.
   mount.innerHTML = `
     <img
       class="app-header__logo"
@@ -39,7 +44,7 @@ export function renderHeader() {
       alt="Gateway Chapter SCTE"
       height="32"
     />
-    <h1 class="app-header__title">Vendor Day 2027</h1>
+    <p class="app-header__title">Vendor Day 2027</p>
     <div class="app-header__menu-wrap">
       <button
         type="button"
@@ -135,6 +140,9 @@ export function renderTabBar(active) {
   mount.className = "tab-bar";
   mount.setAttribute("role", "tablist");
   mount.setAttribute("aria-label", "Main navigation");
+  // `aria-current="page"` on the active tab is a second signal for AT
+  // beyond `aria-selected` (which drives the ARIA tab pattern). The two
+  // overlap but each tool reads one or the other, so we set both.
   mount.innerHTML = TAB_DEFS.map((t, i) => {
     const selected = t.id === active;
     return `
@@ -146,6 +154,7 @@ export function renderTabBar(active) {
         data-tab="${t.id}"
         data-path="${t.path}"
         aria-selected="${selected ? "true" : "false"}"
+        ${selected ? 'aria-current="page"' : ""}
         aria-controls="view-root"
         tabindex="${selected ? "0" : "-1"}"
       >
@@ -188,6 +197,11 @@ export function setActiveTab(active) {
     const match = btn.getAttribute("data-tab") === active;
     btn.setAttribute("aria-selected", match ? "true" : "false");
     btn.setAttribute("tabindex", match ? "0" : "-1");
+    if (match) {
+      btn.setAttribute("aria-current", "page");
+    } else {
+      btn.removeAttribute("aria-current");
+    }
   });
 }
 
@@ -217,9 +231,22 @@ export function updateBadge(tabName, count) {
 
 /* ---------------- View host ---------------- */
 
+/** Suffix every view appends to document.title (design section 11). The
+ *  showView helper strips it when deriving the sr-only h1 so screen reader
+ *  users hear "Agenda", not "Agenda — Vendor Day 2027". */
+const TITLE_SUFFIX = /\s*[\u2013\u2014—–-]\s*Vendor Day 2027\s*$/;
+
 /**
  * Mount a view by invoking `renderFn(root)` into #view-root. Scrolls the
  * viewport to the top so each navigation starts at the top of the view.
+ *
+ * After the view renders, prepends a visually-hidden `<h1>` carrying the
+ * view's name (derived from `document.title`). The app-header's visible
+ * site title is a `<p>` (not an `<h1>`) so the sr-only heading is the
+ * page's single h1 — screen readers can jump to it with the heading
+ * shortcut and the Lighthouse "page has heading" audit stays green on
+ * every route. Views that already render their own `<h1>` are left alone.
+ *
  * @param {(root: HTMLElement) => void | Promise<void>} renderFn
  */
 export async function showView(renderFn) {
@@ -227,9 +254,27 @@ export async function showView(renderFn) {
   if (!root) return;
   root.innerHTML = "";
   await renderFn(root);
+  injectViewHeading(root);
   // Focus the view root so screen readers announce the new view after nav.
   if (typeof root.focus === "function") root.focus({ preventScroll: true });
   window.scrollTo(0, 0);
+}
+
+/**
+ * Prepend an sr-only `<h1>` to `root` sourced from `document.title`. No-op
+ * when the view already rendered its own `<h1>`. Called from showView() —
+ * exported so admin.js can reuse the same injection for the admin shell.
+ * @param {HTMLElement} root
+ */
+export function injectViewHeading(root) {
+  if (!root || root.querySelector("h1")) return;
+  const title = (document.title || "").replace(TITLE_SUFFIX, "").trim();
+  if (!title) return;
+  const h1 = document.createElement("h1");
+  h1.className = "sr-only";
+  h1.setAttribute("data-view-heading", "");
+  h1.textContent = title;
+  root.prepend(h1);
 }
 
 /* ---------------- Toasts ---------------- */
