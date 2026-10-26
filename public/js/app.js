@@ -423,6 +423,20 @@ function captureInstallPrompt() {
   });
 }
 
+/**
+ * Last-chance safety net for promise rejections that escape a view's
+ * local `.catch` / `try/catch`. We log at `warn` so admin diagnostics
+ * surface the problem in devtools without spamming a user-facing toast
+ * (per design section 13, failing fetches are already surfaced per-view
+ * through `ui.toast` + the offline banner). The handler is additive —
+ * views that already handle their own rejections are unaffected.
+ */
+function wireUnhandledRejection() {
+  window.addEventListener("unhandledrejection", (ev) => {
+    console.warn("[unhandledrejection]", ev.reason);
+  });
+}
+
 function wireOnlineOffline() {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     ui.showOfflineBanner();
@@ -434,6 +448,7 @@ function wireOnlineOffline() {
 /* ----------------- Bootstrap ----------------- */
 
 async function main() {
+  wireUnhandledRejection();
   registerServiceWorker();
   captureInstallPrompt();
 

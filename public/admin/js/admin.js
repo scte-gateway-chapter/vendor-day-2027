@@ -358,7 +358,23 @@ function syncPhoneDropdown(slug) {
 
 /* ---------------- Bootstrap ---------------- */
 
+/**
+ * Last-chance safety net for promise rejections that escape an editor's
+ * local `.catch` / `try/catch`. We log at `warn` so admin diagnostics
+ * surface the problem in devtools without spamming a user-facing toast
+ * (per design section 13, each editor already surfaces failed writes /
+ * deletes through `ui.toast` + inline banners that keep dialog values
+ * intact). The handler is additive — editors that already handle their
+ * own rejections are unaffected.
+ */
+function wireUnhandledRejection() {
+  window.addEventListener("unhandledrejection", (ev) => {
+    console.warn("[unhandledrejection]", ev.reason);
+  });
+}
+
 function bootstrap() {
+  wireUnhandledRejection();
   // Pre-paint the shell state so the login screen never flashes nav.
   setAuthShell(isAdminAuthenticated());
 

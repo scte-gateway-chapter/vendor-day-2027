@@ -166,8 +166,13 @@ export default function renderAdminLogin(host) {
     clearError();
     clearCountdown();
 
+    // Design section 13: passphrase is "required, min 1 char, trimmed".
+    // We send the raw value because the server PBKDF2s the raw input, but
+    // the length check uses the trimmed value so whitespace-only input is
+    // rejected inline without a round-trip (and without burning a slot in
+    // the server-side rate limiter).
     const passphrase = input.value;
-    if (!passphrase) {
+    if (!passphrase || !passphrase.trim()) {
       showError("Enter the admin passphrase.");
       input.focus();
       return;

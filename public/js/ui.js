@@ -237,6 +237,15 @@ export function updateBadge(tabName, count) {
 const TITLE_SUFFIX = /\s*[\u2013\u2014—–-]\s*Vendor Day 2027\s*$/;
 
 /**
+ * Set to true after the first view has rendered. Used by showView() to
+ * skip the auto-focus-on-view-root behavior on the initial page load,
+ * which would otherwise prevent the user from Tab-ing to the Skip link.
+ * On subsequent navigations the auto-focus kicks in so screen reader
+ * users hear the new view announced.
+ */
+let viewHasRenderedBefore = false;
+
+/**
  * Mount a view by invoking `renderFn(root)` into #view-root. Scrolls the
  * viewport to the top so each navigation starts at the top of the view.
  *
@@ -255,8 +264,21 @@ export async function showView(renderFn) {
   root.innerHTML = "";
   await renderFn(root);
   injectViewHeading(root);
-  // Focus the view root so screen readers announce the new view after nav.
-  if (typeof root.focus === "function") root.focus({ preventScroll: true });
+  // Focus the view root so screen readers announce the new view — but
+  // ONLY on navigations after the initial page render, and only when
+  // no other element currently has user focus. Skipping the initial
+  // render preserves the user's Tab flow: on page load, body has focus,
+  // and the first Tab should land on the Skip-to-Content link, not on
+  // view-root. On subsequent navigations we auto-focus for the screen
+  // reader announcement unless the user explicitly clicked a control
+  // (in which case we leave their focus where they put it).
+  if (viewHasRenderedBefore && typeof root.focus === "function") {
+    const active = document.activeElement;
+    const activeIsBodyOrNull =
+      !active || active === document.body || active === document.documentElement;
+    if (activeIsBodyOrNull) root.focus({ preventScroll: true });
+  }
+  viewHasRenderedBefore = true;
   window.scrollTo(0, 0);
 }
 
