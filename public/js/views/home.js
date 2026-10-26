@@ -20,6 +20,7 @@ import * as router from "../router.js";
 import * as ui from "../ui.js";
 import { registerViewCleanup } from "../app.js";
 import { relativeTime } from "../utils/time.js";
+import { getLastSignIn } from "./signin.js";
 
 const FALLBACK_EVENT_TITLE = "SCTE Gateway Chapter Vendor Day 2027";
 
@@ -408,9 +409,24 @@ function renderAnnouncementError(host, retry) {
 
 function buildQuickActions() {
   const el = document.createElement("nav");
-  el.className = "home-quick-actions";
+  el.className = "home-quick-actions home-quick-actions--four";
   el.setAttribute("aria-label", "Quick actions");
+
+  // The Sign In entry is a stateful quick-action: it reads from the sign-in
+  // view's localStorage key to decide between "Sign in" (prompt) and
+  // "\u2713 Signed in" (confirmation). The card stays clickable in both
+  // states so the user can reach the view and reset.
+  const signedIn = getLastSignIn();
+  const signInLabel = signedIn ? "\u2713 Signed in" : "Sign in";
+  const signInClass = signedIn
+    ? "btn-secondary home-quick-action--signin home-quick-action--signin-done"
+    : "btn-secondary home-quick-action--signin";
+  const signInAria = signedIn
+    ? `aria-label="You're signed in. Open sign-in view to update."`
+    : `aria-label="Open sign-in form"`;
+
   el.innerHTML = `
+    <button type="button" class="${signInClass}" data-target="#/sign-in" ${signInAria}>${signInLabel}</button>
     <button type="button" class="btn-secondary" data-target="#/agenda">Agenda</button>
     <button type="button" class="btn-secondary" data-target="#/map">Venue map</button>
     <button type="button" class="btn-secondary" data-target="#/sponsors">Sponsors</button>

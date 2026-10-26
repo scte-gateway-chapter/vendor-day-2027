@@ -25,6 +25,7 @@ import { renderAttendees } from "./views/attendees.js";
 import { renderAttendeeDetail } from "./views/attendees-detail.js";
 import { renderFeedback } from "./views/feedback.js";
 import { renderRecap } from "./views/recap.js";
+import { renderSignIn } from "./views/signin.js";
 import {
   initOneSignal,
   getSubscriptionState,
@@ -55,6 +56,7 @@ const ROUTE_TO_TAB = {
   "#/attendees/<id>": "more",
   "#/feedback": "more",
   "#/recap": "more",
+  "#/sign-in": "more",
   "#/about-install": "more",
 };
 
@@ -482,6 +484,7 @@ async function main() {
   );
   router.register("#/feedback", () => ui.showView((root) => renderFeedback(root)));
   router.register("#/recap", () => ui.showView((root) => renderRecap(root)));
+  router.register("#/sign-in", () => ui.showView((root) => renderSignIn(root)));
   router.register("#/about-install", renderAboutInstall);
   router.register("*", render404);
 

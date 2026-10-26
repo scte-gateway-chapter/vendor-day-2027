@@ -17,7 +17,7 @@
 
 const BASE = "https://firestore.googleapis.com/v1";
 
-/** @type {{ firebaseProjectId: string, firebaseWebApiKey: string, oneSignalAppId: string, assetsBaseUrl: string | null } | null} */
+/** @type {{ firebaseProjectId: string, firebaseWebApiKey: string, oneSignalAppId: string, assetsBaseUrl: string | null, signInWebhookUrl: string | null } | null} */
 let config = null;
 /** @type {Promise<void> | null} */
 let initPromise = null;
@@ -25,7 +25,7 @@ let initPromise = null;
 /**
  * Fetch `/api/config` and prime the module-level config cache. Safe to call
  * multiple times — subsequent calls return the same resolved promise.
- * @returns {Promise<{ firebaseProjectId: string, firebaseWebApiKey: string, oneSignalAppId: string, assetsBaseUrl: string | null }>}
+ * @returns {Promise<{ firebaseProjectId: string, firebaseWebApiKey: string, oneSignalAppId: string, assetsBaseUrl: string | null, signInWebhookUrl: string | null }>}
  */
 export function initFirestore() {
   if (config) return Promise.resolve(config);
@@ -46,7 +46,7 @@ export function initFirestore() {
   return initPromise.then(() => config);
 }
 
-/** @returns {{ firebaseProjectId: string, firebaseWebApiKey: string, oneSignalAppId: string, assetsBaseUrl: string | null }} */
+/** @returns {{ firebaseProjectId: string, firebaseWebApiKey: string, oneSignalAppId: string, assetsBaseUrl: string | null, signInWebhookUrl: string | null }} */
 export function getConfig() {
   if (!config) {
     throw new Error("Firestore client not initialized — call initFirestore() first");

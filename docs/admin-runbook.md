@@ -425,3 +425,122 @@ refresh (`Ctrl+Shift+R` on desktop, close-and-reopen on the installed
 PWA). Persistent failures across editors are an infrastructure problem;
 hand off to whoever owns the Cloudflare and Firebase accounts and point
 them at `docs/deployment.md`.
+
+---
+
+## Sign-In Integration
+
+The chapter captures Vendor Day attendance through two independent intake
+paths that both land rows in the same Google Sheet:
+
+1. **Public GoDaddy page** — the `Vendor Day Sign In HTML` module embedded
+   on the chapter's GoDaddy site. Anyone with the URL can sign in.
+2. **In-app Sign-In view** — reachable at `#/sign-in` from inside the
+   installed PWA (Home quick-action and More menu entry).
+
+Both paths POST a form-encoded body with the SAME field names
+(`attendee_name`, `company`, `office_location`, `phone`, `email`,
+`scte_member_number`, `signed_in_at`) to a single Zapier Catch Hook. A
+single Zap writes each submission as a row into one shared Google Sheet.
+
+### Updating the webhook URL
+
+The in-app view reads the webhook URL from the Cloudflare env var
+`ZAPIER_SIGNIN_WEBHOOK_URL` (via the `/api/config` endpoint). The webhook
+URL is **not** hardcoded in the app bundle.
+
+1. Cloudflare → **Pages** → the Vendor Day project → **Settings** →
+   **Variables and Secrets**.
+2. Edit `ZAPIER_SIGNIN_WEBHOOK_URL` (or add it if missing) for both the
+   **Production** and **Preview** scopes.
+3. Save and trigger a redeploy (any `git push` to main, or **Deployments
+   → Retry deploy** on the latest build).
+4. Verify by submitting a test sign-in from the app and confirming a new
+   row appears in the Sheet within ~15 seconds.
+
+If `ZAPIER_SIGNIN_WEBHOOK_URL` is not set, the in-app Sign-In view
+renders a "Sign-in is not yet configured" placeholder instead of the
+form. The GoDaddy page is unaffected — it carries its own hardcoded URL
+in the HTML module (see **Rotating the webhook** below).
+
+### Pointing the Zap at a different Google Sheet
+
+The Zap lives in the chapter's Zapier account.
+
+1. Zapier dashboard → open the Vendor Day sign-in Zap.
+2. **Trigger** step stays as the Catch Hook (keep the URL stable so
+   neither intake path needs changes). If a URL rotation is required,
+   see **Rotating the webhook** below.
+3. **Action** step is a Google Sheets "Create Spreadsheet Row" action.
+   Open it, click **Change** on the Spreadsheet or Worksheet field, and
+   pick the new destination.
+4. Re-run the field mapping if the new Sheet has a different column
+   layout. The source fields coming from the Catch Hook are
+   `attendee_name`, `company`, `office_location`, `phone`, `email`,
+   `scte_member_number`, and `signed_in_at`. Map them onto whichever
+   columns the new Sheet uses.
+5. **Publish** / turn the Zap back on and verify with a test sign-in.
+
+### Rotating the webhook
+
+A new Catch Hook URL is required only if the Zap is deleted and
+rebuilt or if the chapter moves to a different Zapier account. When
+that happens:
+
+1. Grab the new URL from the Catch Hook trigger step.
+2. Update the Cloudflare env var as described in **Updating the webhook
+   URL** above and redeploy the app.
+3. Open the GoDaddy module at
+   `Vendor Day HTML/Vendor Day Sign In HTML` and update the hardcoded
+   `ZAPIER_WEBHOOK` constant in the inline script to the same URL. Save
+   and republish the GoDaddy page.
+
+Both intake paths must be rotated or sign-ins from one path will stop
+appearing in the Sheet.
+
+### Troubleshooting
+
+Sign-ins not landing in the Sheet:
+
+1. **Check the Zap's task history.** Zapier dashboard → the sign-in Zap
+   → **History** tab. Each submission should show a successful task
+   firing within a few seconds. A failed task shows the error from
+   Google Sheets (usually a permission or sharing issue on the Sheet).
+2. **Verify the env var in Cloudflare.** Pages → Settings → Variables
+   and Secrets. `ZAPIER_SIGNIN_WEBHOOK_URL` should be present for both
+   Production and Preview and should match the Catch Hook URL from the
+   Zap exactly.
+3. **Test the webhook directly** from PowerShell:
+
+   ```powershell
+   curl.exe -X POST `
+     -H "Content-Type: application/x-www-form-urlencoded" `
+     -d "attendee_name=Admin Test&company=Diagnostics&office_location=Remote&phone=5555555555&email=admin@example.com&scte_member_number=&signed_in_at=$(Get-Date -Format o)" `
+     "<ZAPIER_WEBHOOK_URL>"
+   ```
+
+   A 200 response from Zapier plus a row in the Sheet within ~15 seconds
+   confirms the webhook and Sheet are working. If the webhook returns a
+   non-200, the Zap is off or the URL is wrong.
+4. **Compare the two intake paths.** If the GoDaddy page works but the
+   in-app form doesn't, the Cloudflare env var is the usual suspect. If
+   the in-app form works but the GoDaddy page doesn't, the hardcoded
+   URL in the GoDaddy HTML is stale. If neither works, the Zap itself
+   or the Sheet is the problem — start at step 1.
+
+### Attendees who sign in and the Attendee Directory
+
+The Sign-In form and the Attendee Directory are two independent
+features with two different data sources:
+
+- Sign-In writes to the Google Sheet via Zapier. Office Location is
+  captured here.
+- Attendee Directory reads from the Firestore `attendees` collection,
+  seeded by the admin CSV importer. See **Attendee directory import**
+  above.
+
+Signing in through the app does NOT add the attendee to the directory,
+and listing someone in the directory does NOT mark them as signed in.
+Office Location is intentionally captured only on the Sign-In form —
+it is a Sheet-only field and does not appear anywhere in the directory
+view.

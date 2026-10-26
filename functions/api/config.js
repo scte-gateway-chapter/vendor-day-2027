@@ -10,6 +10,13 @@
 //                           for sponsor logos, venue map, and recap photos.
 //                           Null when the R2_PUBLIC_URL env var is not set
 //                           (e.g. preview deploys before the binding exists).
+//   - signInWebhookUrl    : Zapier Catch Hook URL used by both the in-app
+//                           attendee sign-in view and the public GoDaddy
+//                           sign-in page. The Zap writes each submission to
+//                           a shared Google Sheet. Null when the
+//                           ZAPIER_SIGNIN_WEBHOOK_URL env var is not set, in
+//                           which case the sign-in view renders a graceful
+//                           "not yet configured" state.
 //
 // Secret keys (service-account JSON, OneSignal REST key, admin JWT secret,
 // admin passphrase hash) are NEVER returned here — they stay server-side.
@@ -75,9 +82,16 @@ export async function onRequest(context) {
   }
 
   const assetsBaseUrl = env.R2_PUBLIC_URL || null;
+  const signInWebhookUrl = env.ZAPIER_SIGNIN_WEBHOOK_URL || null;
 
   return jsonResponse(
-    { firebaseProjectId, firebaseWebApiKey, oneSignalAppId, assetsBaseUrl },
+    {
+      firebaseProjectId,
+      firebaseWebApiKey,
+      oneSignalAppId,
+      assetsBaseUrl,
+      signInWebhookUrl,
+    },
     200,
     cors,
   );

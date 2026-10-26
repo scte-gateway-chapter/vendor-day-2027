@@ -60,6 +60,7 @@ export function renderHeader() {
         role="menu"
         hidden
       >
+        <li role="none"><a role="menuitem" href="#/sign-in">Sign In</a></li>
         <li role="none" class="more-menu__item--recap" data-recap-only hidden><a role="menuitem" href="#/recap">Recap</a></li>
         <li role="none"><a role="menuitem" href="#/about-install">About &amp; Install</a></li>
         <li role="none" data-admin-only hidden><a role="menuitem" href="/admin">Admin</a></li>

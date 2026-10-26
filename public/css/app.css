@@ -775,7 +775,10 @@ a:focus-visible {
   cursor: pointer;
 }
 
-/* Quick actions: stacked on narrow viewports, side-by-side at >= 32rem. */
+/* Quick actions: stacked on narrow viewports, side-by-side at >= 32rem.
+   The default 3-column layout fits the original Agenda / Map / Sponsors
+   trio. The `--four` modifier is used when the Sign In card is also
+   present and switches to a 2x2 grid so four actions stay balanced. */
 .home-quick-actions {
   display: grid;
   grid-template-columns: 1fr;
@@ -786,6 +789,22 @@ a:focus-visible {
   .home-quick-actions {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+  .home-quick-actions--four {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Signed-in state on the Sign In quick action: subtle success tone so the
+   check reads as a confirmed state, while the button stays clickable so
+   the user can reach the view and reset. */
+.home-quick-action--signin-done {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-text);
+}
+.home-quick-action--signin-done:hover,
+.home-quick-action--signin-done:focus-visible {
+  background: #DCF3E4;
 }
 
 /* ---------- Shared Home utilities ---------- */
@@ -2402,3 +2421,132 @@ a:focus-visible {
 .more-menu__item--recap[hidden] {
   display: none;
 }
+
+/* ---------- Sign-In view (post-launch) ---------- */
+
+/* Shared vertical rhythm with the other form views (Feedback). The form
+   itself reuses the generic .form-field primitive so inputs match the
+   rest of the app's form chrome. */
+.signin-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.signin-intro {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  max-width: var(--max-reading-width);
+}
+
+.signin-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  max-width: var(--max-form-width);
+}
+
+/* Per-field overrides on top of .form-field so the sign-in form reads as
+   a familiar form while still giving the hint line a muted tone. */
+.signin-field { margin-bottom: 0; }
+.signin-field[aria-invalid="true"] input {
+  border-color: var(--error-red);
+}
+.signin-field__hint {
+  color: var(--muted-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  margin: 0;
+}
+.signin-field__error[hidden] { display: none; }
+
+/* Inline banner: shares .status-error chrome with the feedback view so the
+   red tone matches the rest of the app's error vocabulary. Local flex
+   layout keeps the retry button on the trailing edge. */
+.signin-inline-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+.signin-inline-banner[hidden] { display: none; }
+.signin-inline-banner .btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+  flex: 0 0 auto;
+}
+
+.signin-form__actions {
+  display: flex;
+  flex-direction: column;
+}
+
+.signin-submit-btn {
+  position: relative;
+  width: 100%;
+}
+@media (min-width: 32rem) {
+  .signin-submit-btn {
+    width: auto;
+    align-self: flex-start;
+    min-width: 12rem;
+  }
+}
+
+/* CSS-only spinner; honors prefers-reduced-motion. */
+.signin-submit-btn__spinner {
+  display: none;
+  width: 16px;
+  height: 16px;
+  margin-right: var(--space-sm);
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #FFF;
+  border-radius: 50%;
+  animation: signin-spin 0.9s linear infinite;
+}
+.signin-submit-btn--loading .signin-submit-btn__spinner { display: inline-block; }
+@keyframes signin-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .signin-submit-btn__spinner { animation: none; }
+}
+
+/* Confirmation card — reuses the success palette tokens so it reads as
+   part of the shared success vocabulary (status-success, toast--success,
+   feedback-confirmation-card). */
+.signin-confirmation-card {
+  padding: var(--space-md);
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.signin-confirmation-card__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--success-text);
+  line-height: var(--line-height-lg);
+}
+.signin-confirmation-card__who,
+.signin-confirmation-card__meta,
+.signin-confirmation-card__body {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--success-text);
+  line-height: var(--line-height-md);
+}
+.signin-confirmation-card__meta {
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.signin-confirmation-card__actions {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: var(--space-sm);
+}
+

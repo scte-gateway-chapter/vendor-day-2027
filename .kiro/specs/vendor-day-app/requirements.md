@@ -181,6 +181,20 @@ The app's year is baked in — 2027. Each future year gets a fresh deployment un
 11. WHEN the app is loaded THEN the system SHALL NOT include third-party analytics or advertising trackers.
 12. WHEN the Attendee Directory is populated THEN the system SHALL include only fields that attendees knew would be published, with an opt-out path (see Requirement 7.5).
 
+### Requirement 13 — In-App Attendee Sign-In
+
+**User Story:** As an attendee walking into the vendor show, I want to sign in from inside the app the same way I would from the chapter's web page, so that my attendance is recorded in the same Google Sheet the board uses to confirm who showed up, without having to pick which form to use.
+
+#### Acceptance Criteria
+
+1. WHEN the user opens the Sign-In view THEN the system SHALL render a form with Name, Company, Office Location, Phone Number, Email Address, and SCTE Member Number fields; Name, Company, Office Location, Phone Number, and Email Address SHALL be required and SCTE Member Number SHALL be optional (matching the public GoDaddy sign-in page).
+2. WHEN the user submits a valid form THEN the system SHALL POST the submission as `application/x-www-form-urlencoded` to the Zapier Catch Hook URL provided by `/api/config` as `signInWebhookUrl`, using the same field names as the public GoDaddy page so a single Zap writes rows from both intake paths into one shared Google Sheet.
+3. WHEN the submission succeeds THEN the system SHALL store the submitter's name, company, and ISO timestamp in `localStorage` under `vendorday2027.signin.lastSubmission` and SHALL replace the form with a confirmation card that identifies the signed-in person and offers a "Sign in as someone else" reset link.
+4. WHEN the user re-visits the Sign-In view on a device that has already submitted THEN the system SHALL show the confirmation card instead of the form; tapping the reset link SHALL clear the stored submission and re-render the form.
+5. WHEN the submission fails (network error, non-2xx response, offline) THEN the system SHALL show an inline error with a Retry affordance and SHALL preserve the user's typed values; the system SHALL NOT silently drop or queue the submission.
+6. IF `signInWebhookUrl` is missing from `/api/config` (the `ZAPIER_SIGNIN_WEBHOOK_URL` env var is unset) THEN the system SHALL render a "Sign-in is not yet configured" placeholder and SHALL log a console warning rather than throwing.
+7. WHEN sign-in records are created THEN the system SHALL NOT write them to any Firestore collection; the Google Sheet (reached via Zapier) is the single source of truth, and Office Location SHALL NOT be surfaced in the attendee directory view.
+
 ## Resolved Decisions
 
 The following decisions have been confirmed by the user and are locked for design:
@@ -195,6 +209,9 @@ The following decisions have been confirmed by the user and are locked for desig
 - **Offline feedback submission**: Fail loudly with retry. No local queue of pending submissions.
 - **Recap push**: Admin choice at publish time (consistent with the per-announcement push toggle in Requirement 6).
 - **Venue map interactivity**: Static zoomable image. No tappable booths or embedded sponsor hotspots in v1.
+- **In-app sign-in intake**: The in-app Sign-In view and the public GoDaddy sign-in page both POST to the same Zapier Catch Hook, which writes rows into a single shared Google Sheet. The webhook URL is deployed as the Cloudflare env var `ZAPIER_SIGNIN_WEBHOOK_URL` and exposed to the client through `/api/config` as `signInWebhookUrl` — no hardcoded URL in the app. Sign-ins are not written to any Firestore collection; the Google Sheet is the source of truth.
+- **Office Location field**: Captured by the Sign-In form and sent to the Sheet, but intentionally not surfaced in the in-app attendee directory.
+- **Sign-in spam protection**: Client-side validation only, matching the GoDaddy form. No honeypot, no CAPTCHA.
 
 ## Confirmed Context
 

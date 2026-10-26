@@ -130,7 +130,7 @@ instructions. When a check fails, pivot to:
       `docs/deployment.md` → Firebase CLI operations → Deploy Firestore
       rules. _(Req 10.1, 10.4, 10.5)_
 
-- [ ] 10. **All nine environment variables present.** Cloudflare → Pages
+- [ ] 10. **All ten environment variables present.** Cloudflare → Pages
        → the project → Settings → Variables and Secrets lists the
        following for **both** Production and Preview scopes:
 
@@ -145,10 +145,13 @@ instructions. When a check fails, pivot to:
        | `ADMIN_PASSPHRASE_HASH` | Both | Secret |
        | `ADMIN_JWT_SECRET` | Both | Secret |
        | `R2_PUBLIC_URL` | Both | Text |
+       | `ZAPIER_SIGNIN_WEBHOOK_URL` | Both | Text |
 
        Missing or misconfigured variables surface as `500 Server
        misconfigured` on `/api/*` endpoints — see `docs/deployment.md`
-       → Smoke tests. _(Req 10.2, 12.8, 12.9, 12.11)_
+       → Smoke tests. `ZAPIER_SIGNIN_WEBHOOK_URL` is checked
+       end-to-end in Section 6a — Sign-in intake. _(Req 10.2, 12.8,
+       12.9, 12.11, 13.2, 13.6)_
 
 ### Section 1 sign-off
 
@@ -532,11 +535,61 @@ instructions. When a check fails, pivot to:
 
 ---
 
+## Section 6a — Sign-in intake
+
+The chapter runs two attendee sign-in paths — the GoDaddy page and the
+in-app Sign-In view — against a single Zapier Catch Hook that writes
+rows into one Google Sheet. These checks confirm both intake paths land
+in the same Sheet. See `docs/admin-runbook.md` → Sign-In Integration
+for the operational detail.
+
+- [ ] 1. **`ZAPIER_SIGNIN_WEBHOOK_URL` env var set and verified.**
+      Cloudflare → Pages → the project → Settings → Variables and
+      Secrets shows `ZAPIER_SIGNIN_WEBHOOK_URL` present for both
+      Production and Preview. The value matches the Catch Hook URL on
+      the trigger step of the Vendor Day sign-in Zap in Zapier.
+      _(Req 13.2, 13.6)_
+
+- [ ] 2. **In-app sign-in writes to the shared Sheet.** Open
+      `https://2027vendorday.gatewayscte.org/#/sign-in` on a phone or
+      laptop. Submit the form with test values (prefix the name with
+      `TEST-` so admins can spot and remove it). The confirmation card
+      renders inline. Within ~15 seconds, a new row appears in the
+      shared Google Sheet with the test values and the current
+      `signed_in_at` timestamp. Delete the row from the Sheet after the
+      check. _(Req 13.1, 13.2, 13.3)_
+
+- [ ] 3. **GoDaddy page writes to the SAME Sheet.** From the public
+      GoDaddy sign-in URL (per the chapter's site), submit a second
+      test row (prefix the name with `TEST-GD-`). Confirm the new row
+      appears in the same Google Sheet as the in-app test from the
+      previous item, in the same column layout, within ~15 seconds.
+      Delete the row from the Sheet after the check. _(Req 13.2)_
+
+- [ ] 4. **GoDaddy sign-in page URL matches the 2027 Zap.** Open
+      `Vendor Day HTML/Vendor Day Sign In HTML` on the chapter's
+      GoDaddy site. The hardcoded `ZAPIER_WEBHOOK` constant in the
+      inline script matches the Catch Hook URL on the trigger step of
+      the Vendor Day sign-in Zap (same URL as item 1 above). If the
+      chapter rotated the Zap at any point, this file was updated to
+      match. _(Req 13.2)_
+
+### Section 6a sign-off
+
+| Item | Status | Who ran it | Date | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | | | | |
+| 2 | | | | row id = |
+| 3 | | | | row id = |
+| 4 | | | | URL last updated = |
+
+---
+
 ## Section 7 — Final go/no-go
 
-- [ ] 1. **Sections 1-6 all pass, OR every failed item has a tracked
-      follow-up.** List each opened follow-up ticket here with its
-      resolution status.
+- [ ] 1. **Sections 1-6 (including 6a) all pass, OR every failed item
+      has a tracked follow-up.** List each opened follow-up ticket here
+      with its resolution status.
 
       | Follow-up | Opened by | Date | Resolution status |
       | --- | --- | --- | --- |
