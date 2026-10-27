@@ -15,9 +15,15 @@
 "use strict";
 
 import { initFirestore, getDoc } from "./firebase.js";
+import { pushDebugLog } from "./debug-log.js";
 
 /** @type {object | null} Last successful read of appSettings/singleton, or null. */
 let cached = null;
+
+/** @type {number | null} Epoch ms of the last successful (or failed) load.
+ *  Exposed via `getAppSettingsCachedAt()` for the debug overlay's "cache
+ *  age" line; otherwise unused by production code. */
+let cachedAt = null;
 
 /** @type {Promise<object | null> | null} In-flight (or resolved) load promise. */
 let loadPromise = null;
@@ -32,15 +38,23 @@ let loadPromise = null;
  */
 export function loadAppSettings() {
   if (loadPromise) return loadPromise;
+  pushDebugLog("app-settings", "fetch start");
   loadPromise = (async () => {
     try {
       await initFirestore();
       const doc = await getDoc("appSettings/singleton");
       cached = doc && typeof doc === "object" ? doc : null;
+      cachedAt = Date.now();
+      pushDebugLog("app-settings", "fetch success", {
+        hasDoc: Boolean(cached),
+        signInEnabled: cached?.signInEnabled === true,
+      });
       return cached;
     } catch (err) {
       console.warn("[app-settings] load failed:", err);
       cached = null;
+      cachedAt = Date.now();
+      pushDebugLog("app-settings", "fetch error", String(err && err.message || err));
       return null;
     }
   })();
@@ -70,4 +84,15 @@ export function getAppSettings() {
  */
 export function isSignInEnabled() {
   return cached?.signInEnabled === true;
+}
+
+/**
+ * Epoch-ms of the last `loadAppSettings()` resolution (success OR failure),
+ * or `null` if the load hasn't finished yet. Used only by the debug
+ * overlay's "cache age" row; production code should keep using
+ * `isSignInEnabled()` and friends.
+ * @returns {number | null}
+ */
+export function getAppSettingsCachedAt() {
+  return cachedAt;
 }

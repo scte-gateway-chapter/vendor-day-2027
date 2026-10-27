@@ -28,6 +28,7 @@
 "use strict";
 
 import { initFirestore } from "./firebase.js";
+import { pushDebugLog } from "./debug-log.js";
 
 const SDK_SRC = "https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js";
 
@@ -97,6 +98,7 @@ function platformShortCircuit() {
  */
 export async function initOneSignal() {
   if (sdkReady) return sdkReady;
+  pushDebugLog("onesignal", "init start");
   sdkReady = (async () => {
     // 1. Pull /api/config for the OneSignal app id. firebase.js caches
     //    this; subsequent callers share the same fetch.
@@ -105,6 +107,7 @@ export async function initOneSignal() {
       config = await initFirestore();
     } catch (err) {
       console.warn("[onesignal] /api/config load failed:", err);
+      pushDebugLog("onesignal", "init error (/api/config)", String(err && err.message || err));
       sdkUnavailable = true;
       return;
     }
@@ -114,6 +117,7 @@ export async function initOneSignal() {
       // in sdkUnavailable so requestPermissionAndSubscribe falls back
       // to the native prompt rather than loading an unconfigured SDK.
       console.warn("[onesignal] /api/config returned no oneSignalAppId; skipping SDK load");
+      pushDebugLog("onesignal", "init skipped: no oneSignalAppId");
       sdkUnavailable = true;
       return;
     }
@@ -123,6 +127,10 @@ export async function initOneSignal() {
     //    where available.
     const p = detectPlatform();
     if (!p.hasNotification || !p.hasServiceWorker) {
+      pushDebugLog("onesignal", "init skipped: browser lacks push capability", {
+        hasNotification: p.hasNotification,
+        hasServiceWorker: p.hasServiceWorker,
+      });
       sdkUnavailable = true;
       return;
     }
@@ -141,6 +149,7 @@ export async function initOneSignal() {
       await loaded;
     } catch (err) {
       console.warn("[onesignal] SDK script load failed:", err);
+      pushDebugLog("onesignal", "SDK script load failed", String(err && err.message || err));
       sdkUnavailable = true;
       return;
     }
@@ -172,8 +181,10 @@ export async function initOneSignal() {
           } catch (err) {
             console.warn("[onesignal] permissionChange listener wire-up failed:", err);
           }
+          pushDebugLog("onesignal", "init success");
         } catch (err) {
           console.warn("[onesignal] OneSignal.init failed:", err);
+          pushDebugLog("onesignal", "OneSignal.init failed", String(err && err.message || err));
         } finally {
           oneSignalNS = OneSignal;
           resolve();
@@ -196,8 +207,10 @@ async function onSdkPermissionChange() {
     state = await getSubscriptionState();
   } catch (err) {
     console.warn("[onesignal] permissionChange state query failed:", err);
+    pushDebugLog("onesignal", "permissionChange state query failed", String(err && err.message || err));
     return;
   }
+  pushDebugLog("onesignal", "permissionChange", { state });
   for (const cb of permissionListeners) {
     try {
       cb(state);
@@ -334,12 +347,17 @@ export async function requestPermissionAndSubscribe() {
     oneSignalNS.User.PushSubscription &&
     typeof oneSignalNS.User.PushSubscription.optIn === "function"
   ) {
+    pushDebugLog("onesignal", "subscribe start (optIn)");
     try {
       await oneSignalNS.User.PushSubscription.optIn();
+      pushDebugLog("onesignal", "subscribe success (optIn resolved)");
     } catch (err) {
       console.warn("[onesignal] PushSubscription.optIn failed:", err);
+      pushDebugLog("onesignal", "subscribe error", String(err && err.message || err));
     }
-    return await getSubscriptionState();
+    const after = await getSubscriptionState();
+    pushDebugLog("onesignal", "subscribe final state", { state: after });
+    return after;
   }
 
   // SDK unavailable (deploy misconfig or script failed to load). Fall
@@ -393,13 +411,18 @@ export async function unsubscribeFromPush() {
     oneSignalNS.User.PushSubscription &&
     typeof oneSignalNS.User.PushSubscription.optOut === "function"
   ) {
+    pushDebugLog("onesignal", "unsubscribe start (optOut)");
     try {
       await oneSignalNS.User.PushSubscription.optOut();
+      pushDebugLog("onesignal", "unsubscribe success (optOut resolved)");
     } catch (err) {
       console.warn("[onesignal] PushSubscription.optOut failed:", err);
+      pushDebugLog("onesignal", "unsubscribe error", String(err && err.message || err));
     }
   }
-  return await getSubscriptionState();
+  const after = await getSubscriptionState();
+  pushDebugLog("onesignal", "unsubscribe final state", { state: after });
+  return after;
 }
 
 /* ---------------- Listeners ---------------- */

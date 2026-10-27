@@ -45,6 +45,7 @@ import {
   unsubscribeFromPush,
   addPermissionListener,
 } from "../onesignal.js";
+import { pushDebugLog } from "../debug-log.js";
 
 const DECISION_KEY = "vendorday2027.push.decision";
 const LAST_VIEWED_KEY = "vendorday2027.announcements.lastViewedAt";
@@ -388,6 +389,7 @@ function buildSupportedOptInCard(optInHost, deniedHost) {
     // Guard against double-tap re-entry on top of the natural "disabled"
     // visual: an already-busy button must not kick off a second optIn.
     if (btn.disabled) return;
+    pushDebugLog("notifications", "Enable notifications tapped");
     btn.disabled = true;
     btn.setAttribute("aria-busy", "true");
     hideStatus(statusEl);
@@ -484,6 +486,7 @@ function buildSubscribedCard(optInHost, deniedHost) {
   turnOffBtn.addEventListener("click", async (ev) => {
     const btn = ev.currentTarget;
     if (btn.disabled) return;
+    pushDebugLog("notifications", "Turn off notifications tapped");
     btn.disabled = true;
     btn.setAttribute("aria-busy", "true");
     hideStatus(statusEl);

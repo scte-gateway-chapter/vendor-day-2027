@@ -33,6 +33,8 @@ import {
   requestPermissionAndSubscribe,
   addPermissionListener,
 } from "./onesignal.js";
+import { pushDebugLog, isDebugEnabled } from "./debug-log.js";
+import { mountDebugOverlay } from "./debug-overlay.js";
 
 /** Persistent flag — once the user taps "I'll do this later" we skip Welcome
  *  for every subsequent visit on this device. Cleared only by the user via
@@ -451,6 +453,10 @@ function wireOnlineOffline() {
 /* ----------------- Bootstrap ----------------- */
 
 async function main() {
+  // The debug overlay runs behind an explicit `?debug=1` gate. Logging
+  // here is a no-op when the gate is off (see debug-log.js), so this
+  // call site is safe to leave uninstrumented in production.
+  pushDebugLog("boot", "app boot start");
   wireUnhandledRejection();
   registerServiceWorker();
   captureInstallPrompt();
@@ -503,14 +509,22 @@ async function main() {
 
   // Initialize Firestore config in the background. Views that need it await
   // `firestoreReady` to avoid racing the /api/config fetch.
-  firestoreReady = initFirestore().catch((err) => {
-    console.warn("[app] /api/config load failed \u2014 Firestore reads will error until this is resolved:", err);
-    ui.toast(
-      "error",
-      "Could not load app config. Some content may be unavailable.",
-      { durationMs: 6000 },
-    );
-  });
+  firestoreReady = initFirestore()
+    .then((cfg) => {
+      pushDebugLog("boot", "/api/config loaded", {
+        keys: cfg ? Object.keys(cfg).sort() : [],
+      });
+      return cfg;
+    })
+    .catch((err) => {
+      console.warn("[app] /api/config load failed \u2014 Firestore reads will error until this is resolved:", err);
+      pushDebugLog("boot", "/api/config failed", String(err && err.message || err));
+      ui.toast(
+        "error",
+        "Could not load app config. Some content may be unavailable.",
+        { durationMs: 6000 },
+      );
+    });
 
   // Kick off the OneSignal SDK load on window.load so a slow CDN never
   // blocks first paint. The call is idempotent — any view that awaits
@@ -550,6 +564,13 @@ async function main() {
     });
 
   router.start();
+
+  // Mount the on-device debug overlay last so it floats above every
+  // other surface. Gated on `?debug=1` (or a sticky sessionStorage flag
+  // from a prior visit); a no-op otherwise.
+  if (isDebugEnabled()) {
+    mountDebugOverlay();
+  }
 }
 
 /* ----------------- App-lifetime recap-published poll ----------------- */

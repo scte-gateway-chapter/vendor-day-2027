@@ -527,6 +527,12 @@ Sign-ins not landing in the Sheet:
    the in-app form works but the GoDaddy page doesn't, the hardcoded
    URL in the GoDaddy HTML is stale. If neither works, the Zap itself
    or the Sheet is the problem — start at step 1.
+5. **If the in-app form fires but the row is missing, or you suspect a
+   stale app shell on the test device,** open the attendee app with
+   `?debug=1` appended to the URL and read the on-device debug overlay.
+   It shows the BUILD_ID the device is actually running, whether
+   `signInWebhookUrl` reached the device via `/api/config`, and a
+   rolling event feed. See **Debug overlay** below.
 
 ### Attendees who sign in and the Attendee Directory
 
@@ -601,3 +607,93 @@ settings. The two intake paths share one Zapier Catch Hook and one
 Google Sheet, but their visibility is managed independently so the
 board can run back-of-house tests against the GoDaddy page while the
 in-app surface stays hidden.
+
+---
+
+## Debug overlay
+
+The attendee app ships with a hidden on-device diagnostic overlay for
+field troubleshooting. It is not linked from any UI; you have to type
+it in on the device you want to inspect. Nothing in the overlay is a
+secret (no passphrase, no OneSignal REST key, no webhook URL — just
+whether those values _reached_ the device), so it is safe to leave
+turned on for the duration of a troubleshooting session.
+
+**When to use it:**
+
+- The attendee says a push arrived on one device but not another and
+  you need to confirm which build the other device is running.
+- The **Enable notifications** button dims and never resolves. The
+  overlay's **Recent events** feed shows whether the OneSignal SDK
+  loaded, whether `optIn()` was called, and whether a result came back.
+- You suspect a device is running a stale service worker shell after
+  a redeploy. The **BUILD_ID (sw.js)** row reports the id the device
+  is actually serving, which you can compare against the latest
+  Cloudflare build id.
+- A field tester reports an in-app Sign-In form that fires but doesn't
+  land a row in the Google Sheet. The **Config endpoint** section shows
+  whether `signInWebhookUrl` reached the device via `/api/config`.
+
+**How to turn it on:**
+
+1. On the test device, append `?debug=1` to the attendee app URL. From
+   the installed PWA home-screen icon, the easiest path is to open the
+   app's URL in Chrome / Safari with the query string, then switch back
+   to the installed PWA — the overlay persists for the browser tab's
+   session via `sessionStorage`.
+2. A small `🐞 DEBUG` tab appears in the bottom-right (bottom-center on
+   narrow phone screens). Tap it to expand the panel.
+3. To turn it off, tap the `×` dismiss button in the panel's header, or
+   append `?debug=0` to the URL.
+
+**What each section shows:**
+
+- **App version** — the service worker's `BUILD_ID`, the service
+  worker's controller URL, its scope, and whether the sessionStorage
+  flag is sticky. If `BUILD_ID` differs from the latest Cloudflare
+  build id, the device is on a stale shell; use the **Unregister SW**
+  action below.
+- **Config endpoint** — whether `/api/config` loaded and the names
+  of the keys it returned. The OneSignal App ID line reports presence
+  only, masked to the last four characters so you can tell apart two
+  OneSignal apps without sharing the full id in a screenshot. The
+  `signInWebhookUrl` line reports `yes` or `no` — no URL text.
+- **OneSignal state** — whether the SDK's `OneSignal` global is on the
+  page, the `User.PushSubscription.optedIn` boolean, whether a
+  subscription id exists (last 6 characters only), the SDK's
+  `Notifications.permission` boolean, and the browser-native
+  `Notification.permission` string. A device that reports
+  `OneSignal.Notifications.permission: true` but a browser
+  `Notification.permission: default` is in a weird intermediate state —
+  typical cause is a push token that didn't survive a factory reset
+  of the device.
+- **App settings** — whether `appSettings/singleton` has loaded,
+  whether `signInEnabled` is on, and how long ago the cache was
+  populated.
+- **Recent events** — the last twenty entries from a rolling in-memory
+  log emitted by the app at key points (SDK init, subscribe/unsubscribe
+  calls, settings fetch, Enable Notifications button taps). Newest
+  first with wall-clock timestamps.
+
+**Actions at the bottom of the panel:**
+
+- **Copy debug text** — serializes the entire overlay (every section
+  plus the events feed) into a plaintext block and writes it to the
+  clipboard. Paste it into a chat message, support ticket, or email so
+  someone with access to the Cloudflare / OneSignal dashboards can
+  compare the on-device state against what the services actually show.
+- **Re-check state** — re-queries SDK state without waiting for the
+  one-second poll. Useful after an SDK event just fired.
+- **Unregister SW** — asks for confirmation, then unregisters every
+  service worker on the origin. The page reloads afterward. For a
+  truly stale device, follow up by clearing site data in browser
+  settings before reloading (the overlay reminds you with an alert).
+- **Reload** — a plain full-page reload. The service worker still
+  serves cached assets; use **Unregister SW** instead if you need to
+  defeat the cache.
+
+**Sharing debug output with support:** tap **Copy debug text**, then
+paste the result into whatever channel you use to reach the orchestrator
+or the dev team. The paste includes no secrets, no PII, and no
+subscription ids — just metadata about what the device thinks is going
+on. It is a safe thing to send over Slack, email, or screen-share chat.

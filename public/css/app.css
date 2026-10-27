@@ -2669,3 +2669,244 @@ a:focus-visible {
   margin: 0 0 var(--space-md);
 }
 
+/* ---------- Debug overlay ----------
+   Floating diagnostic panel toggled by `?debug=1` on the URL. Not linked
+   from any UI; discoverable only via the query string. Lives at the max
+   possible z-index so it floats above every other surface including
+   admin modals. See docs/admin-runbook.md → "Debug overlay". */
+
+.debug-overlay {
+  position: fixed;
+  right: var(--space-md);
+  bottom: calc(var(--tab-bar-height) + env(safe-area-inset-bottom, 0px) + var(--space-md));
+  z-index: 2147483647;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  pointer-events: none;
+  /* The container itself passes through clicks; only children capture. */
+}
+
+.debug-overlay__tab,
+.debug-overlay__panel {
+  pointer-events: auto;
+}
+
+.debug-overlay__tab {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+  background: rgba(34, 34, 34, 0.85);
+  color: #FFF;
+  border: 1px solid var(--brand-green);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  cursor: pointer;
+}
+.debug-overlay__tab:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}
+
+.debug-overlay__tab-label {
+  font-family: inherit;
+  letter-spacing: 0.04em;
+}
+
+.debug-overlay__tab-badge {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: var(--space-xs);
+  background: var(--brand-green);
+  color: #FFF;
+  border-radius: 9px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+
+.debug-overlay__panel {
+  width: min(640px, 90vw);
+  max-height: 70vh;
+  overflow-y: auto;
+  background: rgba(34, 34, 34, 0.95);
+  color: #FFF;
+  border: 1px solid var(--brand-green);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-md);
+  animation: debug-overlay-in 180ms ease-out;
+}
+.debug-overlay__panel:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}
+
+@keyframes debug-overlay-in {
+  from { transform: translateY(8px); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .debug-overlay__panel { animation: none; }
+}
+
+.debug-overlay__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.debug-overlay__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+  color: #FFF;
+}
+
+.debug-overlay__dismiss {
+  min-width: 44px;
+  min-height: 44px;
+  color: #FFF;
+  font-size: var(--font-size-xl);
+  line-height: 1;
+  border-radius: var(--radius);
+}
+.debug-overlay__dismiss:hover,
+.debug-overlay__dismiss:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.debug-overlay__sections {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.debug-overlay__section {
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+  padding-top: var(--space-sm);
+}
+.debug-overlay__section:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.debug-overlay__section-title {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--brand-green);
+}
+
+.debug-overlay__kv {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(10rem, max-content) 1fr;
+  gap: var(--space-xs) var(--space-sm);
+}
+
+.debug-overlay__kv-label {
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  color: var(--border-neutral);
+}
+
+.debug-overlay__kv-value {
+  margin: 0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  color: #FFF;
+  word-break: break-all;
+}
+
+.debug-overlay__events-wrap {
+  margin-top: var(--space-md);
+}
+
+.debug-overlay__events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 14rem;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius);
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.debug-overlay__event {
+  display: grid;
+  grid-template-columns: max-content max-content 1fr;
+  gap: var(--space-xs) var(--space-sm);
+  padding: var(--space-xs) var(--space-sm);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 0.75rem;
+  line-height: 1.3;
+}
+.debug-overlay__event:last-child { border-bottom: none; }
+.debug-overlay__event--empty {
+  color: var(--border-neutral);
+  grid-template-columns: 1fr;
+}
+
+.debug-overlay__event-ts { color: var(--border-neutral); }
+.debug-overlay__event-cat {
+  color: var(--brand-green);
+  font-weight: 600;
+}
+.debug-overlay__event-msg { color: #FFF; word-break: break-word; }
+.debug-overlay__event-data {
+  grid-column: 1 / -1;
+  color: var(--border-neutral);
+  word-break: break-all;
+}
+
+.debug-overlay__actions {
+  margin-top: var(--space-md);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+/* Reuse the shared .btn-secondary chrome but tighten it for the overlay
+   so four buttons fit on a 320px-wide phone screen. */
+.debug-overlay__action.btn-secondary {
+  min-height: 36px;
+  padding: var(--space-xs) var(--space-sm);
+  font-size: var(--font-size-sm);
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFF;
+  border-color: var(--brand-green);
+}
+.debug-overlay__action.btn-secondary:hover,
+.debug-overlay__action.btn-secondary:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* On narrow screens, pin the collapsed tab to the bottom-center so a
+   left-handed thumb can reach it without stretching to the right edge. */
+@media (max-width: 480px) {
+  .debug-overlay {
+    right: 50%;
+    transform: translateX(50%);
+    align-items: center;
+  }
+  .debug-overlay__panel { width: 92vw; }
+}
+
