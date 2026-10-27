@@ -409,28 +409,49 @@ function renderAnnouncementError(host, retry) {
 
 function buildQuickActions() {
   const el = document.createElement("nav");
-  el.className = "home-quick-actions home-quick-actions--four";
   el.setAttribute("aria-label", "Quick actions");
 
   // The Sign In entry is a stateful quick-action: it reads from the sign-in
-  // view's localStorage key to decide between "Sign in" (prompt) and
-  // "\u2713 Signed in" (confirmation). The card stays clickable in both
-  // states so the user can reach the view and reset.
+  // view's localStorage key to decide between a plain "Sign in" button and
+  // a prominent "You're signed in as <name>" confirmation card. Both states
+  // navigate to #/sign-in so the user can reach the view and reset.
+  //
+  // When signed in, the grid switches to the `--signed-in` modifier so the
+  // indicator can span the full first row at wide viewports; the three
+  // navigation buttons fall into row 2. On narrow viewports every cell is
+  // full-width so the span rule is a no-op.
   const signedIn = getLastSignIn();
-  const signInLabel = signedIn ? "\u2713 Signed in" : "Sign in";
-  const signInClass = signedIn
-    ? "btn-secondary home-quick-action--signin home-quick-action--signin-done"
-    : "btn-secondary home-quick-action--signin";
-  const signInAria = signedIn
-    ? `aria-label="You're signed in. Open sign-in view to update."`
-    : `aria-label="Open sign-in form"`;
 
-  el.innerHTML = `
-    <button type="button" class="${signInClass}" data-target="#/sign-in" ${signInAria}>${signInLabel}</button>
-    <button type="button" class="btn-secondary" data-target="#/agenda">Agenda</button>
-    <button type="button" class="btn-secondary" data-target="#/map">Venue map</button>
-    <button type="button" class="btn-secondary" data-target="#/sponsors">Sponsors</button>
-  `;
+  if (signedIn) {
+    el.className = "home-quick-actions home-quick-actions--signed-in";
+    el.innerHTML = `
+      <button
+        type="button"
+        class="signin-indicator"
+        data-target="#/sign-in"
+        aria-label="You're signed in as ${escapeHtml(signedIn.name)}. Open sign-in view to update."
+      >
+        <span class="signin-indicator__icon" aria-hidden="true">\u2713</span>
+        <span class="signin-indicator__text">
+          <span class="signin-indicator__primary">You're signed in</span>
+          <span class="signin-indicator__name">as ${escapeHtml(signedIn.name)}</span>
+          <span class="signin-indicator__hint">Tap to update</span>
+        </span>
+      </button>
+      <button type="button" class="btn-secondary" data-target="#/agenda">Agenda</button>
+      <button type="button" class="btn-secondary" data-target="#/map">Venue map</button>
+      <button type="button" class="btn-secondary" data-target="#/sponsors">Sponsors</button>
+    `;
+  } else {
+    el.className = "home-quick-actions home-quick-actions--four";
+    el.innerHTML = `
+      <button type="button" class="btn-secondary home-quick-action--signin" data-target="#/sign-in" aria-label="Open sign-in form">Sign in</button>
+      <button type="button" class="btn-secondary" data-target="#/agenda">Agenda</button>
+      <button type="button" class="btn-secondary" data-target="#/map">Venue map</button>
+      <button type="button" class="btn-secondary" data-target="#/sponsors">Sponsors</button>
+    `;
+  }
+
   el.querySelectorAll("[data-target]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const target = btn.getAttribute("data-target");

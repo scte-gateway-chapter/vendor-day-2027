@@ -11,6 +11,7 @@
 
 import { initFirestore, getDoc } from "../firebase.js";
 import * as router from "../router.js";
+import { getLastSignIn } from "./signin.js";
 
 /** Hard-coded fallbacks when `appSettings/singleton` is unreachable. */
 const FALLBACK_EVENT_TITLE = "SCTE Gateway Chapter Vendor Day 2027";
@@ -57,6 +58,13 @@ export async function renderWelcome(host, opts = {}) {
   `;
   host.append(heroCard);
 
+  // Sign-In CTA sits between the hero and the install card so it reads as
+  // a secondary action beneath the headline without competing with the
+  // install prompt for the primary click. If the attendee has already
+  // signed in on this device, it swaps to the shared `.signin-indicator`
+  // treatment that mirrors the Home card.
+  host.append(buildWelcomeSignInCta());
+
   const installCard = document.createElement("section");
   installCard.className = "card welcome-install-card";
   renderInstallCardBody(installCard);
@@ -97,6 +105,51 @@ export async function renderWelcome(host, opts = {}) {
 export default renderWelcome;
 
 /* ---------------- helpers ---------------- */
+
+/**
+ * Build the Sign-In CTA that sits below the hero. Two states, both
+ * reach `#/sign-in` on activation:
+ *   - Not signed in: a large outlined "Sign in for today" card that reads
+ *     as a secondary CTA next to the install card's primary button.
+ *   - Signed in: the shared `.signin-indicator` block with the attendee's
+ *     name so the "already signed in" state is unmistakable at arm's
+ *     length. The block stays interactive so the user can reach the view
+ *     and reset.
+ */
+function buildWelcomeSignInCta() {
+  const signedIn = getLastSignIn();
+
+  if (signedIn) {
+    const el = document.createElement("a");
+    el.className = "signin-indicator welcome-signin-indicator";
+    el.href = "#/sign-in";
+    el.setAttribute(
+      "aria-label",
+      `You're signed in as ${signedIn.name}. Open sign-in view to update.`,
+    );
+    el.innerHTML = `
+      <span class="signin-indicator__icon" aria-hidden="true">\u2713</span>
+      <span class="signin-indicator__text">
+        <span class="signin-indicator__primary">You're signed in</span>
+        <span class="signin-indicator__name">as ${escapeHtml(signedIn.name)}</span>
+        <span class="signin-indicator__hint">Tap to update</span>
+      </span>
+    `;
+    return el;
+  }
+
+  const el = document.createElement("a");
+  el.className = "welcome-signin-cta";
+  el.href = "#/sign-in";
+  el.innerHTML = `
+    <span class="welcome-signin-cta__text">
+      <span class="welcome-signin-cta__title">Sign in for today</span>
+      <span class="welcome-signin-cta__hint">Record your attendance in the chapter's sign-in sheet.</span>
+    </span>
+    <span class="welcome-signin-cta__chevron" aria-hidden="true">\u203A</span>
+  `;
+  return el;
+}
 
 function isStandalone() {
   return (

@@ -777,8 +777,11 @@ a:focus-visible {
 
 /* Quick actions: stacked on narrow viewports, side-by-side at >= 32rem.
    The default 3-column layout fits the original Agenda / Map / Sponsors
-   trio. The `--four` modifier is used when the Sign In card is also
-   present and switches to a 2x2 grid so four actions stay balanced. */
+   trio. The `--four` modifier is used when the Sign In button is also
+   present (not-yet-signed-in state) and switches to a 2x2 grid so four
+   actions stay balanced. The `--signed-in` modifier keeps a 3-column
+   grid at wide viewports and lets the prominent `.signin-indicator` card
+   span the full first row above the three navigation buttons. */
 .home-quick-actions {
   display: grid;
   grid-template-columns: 1fr;
@@ -792,19 +795,12 @@ a:focus-visible {
   .home-quick-actions--four {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-}
-
-/* Signed-in state on the Sign In quick action: subtle success tone so the
-   check reads as a confirmed state, while the button stays clickable so
-   the user can reach the view and reset. */
-.home-quick-action--signin-done {
-  background: var(--success-bg);
-  border-color: var(--success-border);
-  color: var(--success-text);
-}
-.home-quick-action--signin-done:hover,
-.home-quick-action--signin-done:focus-visible {
-  background: #DCF3E4;
+  .home-quick-actions--signed-in {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .home-quick-actions--signed-in > .signin-indicator {
+    grid-column: 1 / -1;
+  }
 }
 
 /* ---------- Shared Home utilities ---------- */
@@ -2513,7 +2509,7 @@ a:focus-visible {
   .signin-submit-btn__spinner { animation: none; }
 }
 
-/* Confirmation card — reuses the success palette tokens so it reads as
+/* Confirmation card ï¿½ reuses the success palette tokens so it reads as
    part of the shared success vocabulary (status-success, toast--success,
    feedback-confirmation-card). */
 .signin-confirmation-card {
@@ -2548,5 +2544,115 @@ a:focus-visible {
   display: flex;
   justify-content: flex-start;
   margin-top: var(--space-sm);
+}
+
+/* ---------- Sign-In CTA + "already signed in" indicator ---------- */
+
+/* Welcome-screen CTA shown to attendees who have NOT yet signed in on
+   this device. Reads as a large outlined secondary action so it is
+   discoverable without competing with the install card's brand-green
+   primary button directly below it. Reuses existing palette tokens. */
+.welcome-signin-cta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 56px;
+  padding: var(--space-md);
+  margin: 0 0 var(--space-md);
+  background: var(--surface);
+  border: 1px solid var(--brand-green);
+  border-radius: var(--radius);
+  color: var(--brand-green-text);
+  text-decoration: none;
+  box-shadow: var(--shadow-sm);
+}
+.welcome-signin-cta:hover,
+.welcome-signin-cta:focus-visible {
+  background: #EEF8F2;
+  color: var(--brand-green-text);
+}
+.welcome-signin-cta__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.welcome-signin-cta__title {
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-md);
+  color: var(--brand-green-text);
+}
+.welcome-signin-cta__hint {
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.welcome-signin-cta__chevron {
+  flex: 0 0 auto;
+  color: var(--brand-green-text);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+/* Shared "already signed in" indicator used by both the Home quick-actions
+   grid and the Welcome CTA slot. Prominent success-palette treatment so
+   the state is unmistakable at arm's length (field techs through
+   leadership, wide age range). Both renderings navigate to #/sign-in so
+   the user can still reach the view and reset. */
+.signin-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  min-height: 72px;
+  padding: var(--space-sm) var(--space-md);
+  margin: 0;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius);
+  color: var(--success-text);
+  text-decoration: none;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.signin-indicator:hover,
+.signin-indicator:focus-visible {
+  background: #DCF3E4;
+  color: var(--success-text);
+}
+.signin-indicator__icon {
+  flex: 0 0 auto;
+  font-size: 2rem;
+  line-height: 1;
+  color: var(--success-text);
+}
+.signin-indicator__text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.signin-indicator__primary {
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  line-height: var(--line-height-md);
+}
+.signin-indicator__name {
+  font-weight: 600;
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+.signin-indicator__hint {
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+/* Welcome variant adds vertical rhythm with the install card below. */
+.welcome-signin-indicator {
+  margin: 0 0 var(--space-md);
 }
 

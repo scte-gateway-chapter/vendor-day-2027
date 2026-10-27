@@ -194,6 +194,8 @@ The app's year is baked in — 2027. Each future year gets a fresh deployment un
 5. WHEN the submission fails (network error, non-2xx response, offline) THEN the system SHALL show an inline error with a Retry affordance and SHALL preserve the user's typed values; the system SHALL NOT silently drop or queue the submission.
 6. IF `signInWebhookUrl` is missing from `/api/config` (the `ZAPIER_SIGNIN_WEBHOOK_URL` env var is unset) THEN the system SHALL render a "Sign-in is not yet configured" placeholder and SHALL log a console warning rather than throwing.
 7. WHEN sign-in records are created THEN the system SHALL NOT write them to any Firestore collection; the Google Sheet (reached via Zapier) is the single source of truth, and Office Location SHALL NOT be surfaced in the attendee directory view.
+8. WHEN the Sign-In view is reachable THEN the system SHALL expose a Sign-In entry point from three locations: a prominent card on the Home view, a prominent CTA on the Welcome / Install view (below the hero and above the install card), and an entry at the top of the overflow menu in the app header.
+9. WHEN a prior sign-in submission is stored on the device THEN the Home and Welcome Sign-In entry points SHALL display a high-contrast confirmation using the shared success palette, showing a check icon, a bold "You're signed in" line, the stored attendee name, and a muted "Tap to update" hint; both treatments SHALL remain clickable and SHALL route to `#/sign-in` so the attendee can reach the view and reset.
 
 ## Resolved Decisions
 
