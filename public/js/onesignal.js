@@ -45,6 +45,22 @@ let oneSignalNS = null;
  *  falls back to the native Notification.requestPermission() so the UI
  *  still has a sensible outcome. */
 let sdkUnavailable = false;
+/** Outcome of the `OneSignal.init(...)` call itself, independent of
+ *  whether we even got as far as calling it. Field testing on a
+ *  factory-reset Motorola Android caught a case where init threw with
+ *  `TypeError: crypto.randomUUID is not a function` — the SDK was
+ *  loaded (so `sdkUnavailable` stayed false and the OneSignal namespace
+ *  was present), but calling `optIn()` on an uninitialized SDK returned
+ *  a Promise that neither resolved nor rejected, leaving the Enable
+ *  Notifications button dim forever. Guarding on this tri-state lets
+ *  the entry points reject fast with a captured error instead of
+ *  waiting on a Promise that never settles.
+ *  @type {"pending" | "ready" | "failed"} */
+let initState = "pending";
+/** The error thrown by `OneSignal.init(...)` when `initState === "failed"`.
+ *  Captured so entry points can reject with the original cause and the
+ *  debug overlay can show the exact message that broke init. */
+let initError = null;
 /** Callbacks subscribed via `addPermissionListener`. One SDK-level
  *  permissionChange listener fans out to this set. */
 const permissionListeners = new Set();
@@ -181,8 +197,11 @@ export async function initOneSignal() {
           } catch (err) {
             console.warn("[onesignal] permissionChange listener wire-up failed:", err);
           }
+          initState = "ready";
           pushDebugLog("onesignal", "init success");
         } catch (err) {
+          initState = "failed";
+          initError = err instanceof Error ? err : new Error(String(err));
           console.warn("[onesignal] OneSignal.init failed:", err);
           pushDebugLog("onesignal", "OneSignal.init failed", String(err && err.message || err));
         } finally {
@@ -218,6 +237,34 @@ async function onSdkPermissionChange() {
       // Deliberately swallowed — see note above.
     }
   }
+}
+
+/**
+ * Await the init pipeline with a hard timeout. Entry points that need
+ * to call into the SDK (`optIn` / `optOut`) call this before touching
+ * the OneSignal namespace so a stuck init can't leave the UI hanging
+ * forever. Returns the final `initState` value so the caller can
+ * branch; a timeout flips `initState` to `"failed"` with a synthetic
+ * error so a subsequent call doesn't re-wait for the same stuck init.
+ * @returns {Promise<"pending" | "ready" | "failed">}
+ */
+async function awaitInitReady() {
+  if (!sdkReady) initOneSignal();
+  if (initState !== "pending") return initState;
+  try {
+    await Promise.race([
+      sdkReady,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("SDK init timeout")), 10000),
+      ),
+    ]);
+  } catch (err) {
+    if (initState === "pending") {
+      initState = "failed";
+      initError = err instanceof Error ? err : new Error(String(err));
+    }
+  }
+  return initState;
 }
 
 /* ---------------- State query ---------------- */
@@ -327,17 +374,19 @@ export async function requestPermissionAndSubscribe() {
 
   // state === "not-prompted". Await SDK readiness first; init is kicked
   // off by app.js on window.load so it should already be settled by the
-  // time the user taps Enable, but defend against a slow CDN.
-  if (!sdkReady) initOneSignal();
-  try {
-    await Promise.race([
-      sdkReady,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("SDK init timeout")), 5000),
-      ),
-    ]);
-  } catch (_err) {
-    /* non-fatal; try the native fallback below */
+  // time the user taps Enable, but defend against a slow CDN. The guard
+  // also surfaces an `OneSignal.init` throw as a thrown Error (vs a
+  // Promise that never settles) so the view's 15-second subscribe
+  // timeout isn't the only safety net — see initState docs above.
+  const readiness = await awaitInitReady();
+  pushDebugLog("onesignal", "subscribe init check", { initState: readiness });
+  if (readiness === "failed" && !sdkUnavailable) {
+    pushDebugLog(
+      "onesignal",
+      "subscribe aborted: init failed",
+      String(initError && initError.message || initError),
+    );
+    throw initError || new Error("OneSignal init failed");
   }
 
   if (
@@ -393,16 +442,16 @@ export async function requestPermissionAndSubscribe() {
  * @returns {Promise<"granted"|"denied"|"default"|"ios-install-required"|"unsupported"|"not-prompted">}
  */
 export async function unsubscribeFromPush() {
-  if (!sdkReady) initOneSignal();
-  try {
-    await Promise.race([
-      sdkReady,
-      new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("SDK init timeout")), 5000),
-      ),
-    ]);
-  } catch (_err) {
-    /* non-fatal; the state query below still returns something sensible */
+  // Same guard as the subscribe path — see awaitInitReady() + initState.
+  const readiness = await awaitInitReady();
+  pushDebugLog("onesignal", "unsubscribe init check", { initState: readiness });
+  if (readiness === "failed" && !sdkUnavailable) {
+    pushDebugLog(
+      "onesignal",
+      "unsubscribe aborted: init failed",
+      String(initError && initError.message || initError),
+    );
+    throw initError || new Error("OneSignal init failed");
   }
   if (
     !sdkUnavailable &&

@@ -10,6 +10,14 @@
 //   5. Start the router.
 "use strict";
 
+// MUST stay first: `./polyfills.js` installs `crypto.randomUUID` on
+// browsers that haven't shipped it yet. The OneSignal Web SDK v16
+// constructor calls that method unconditionally during init, so the
+// polyfill has to be in place before any other module (`onesignal.js`
+// in particular) runs. ES-module import order within a file determines
+// evaluation order, so leave this import above every other `import`.
+import "./polyfills.js";
+
 import * as router from "./router.js";
 import * as ui from "./ui.js";
 import { initFirestore, getDoc, onSnapshot } from "./firebase.js";

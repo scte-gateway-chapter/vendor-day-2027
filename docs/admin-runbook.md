@@ -266,6 +266,18 @@ the app directly to that announcement card with a brief highlight.
   the OneSignal-failure case. Clicking Publish again on an existing
   announcement never fires a second push.
 
+### Troubleshooting push delivery
+
+If an attendee reports the **Enable notifications** button hangs with no
+OS prompt, open the debug overlay (`?debug=1`) on that device and check
+the event feed for `OneSignal.init failed`. The polyfill shipped in
+the "Polyfill crypto.randomUUID so OneSignal SDK init works on older
+browsers" commit handles the most common cause
+(`crypto.randomUUID` missing in older browsers). If a different init
+error appears, capture the debug text via the **Copy debug text** button
+and share it with support — see **Debug overlay** below for how to
+reach the panel.
+
 ---
 
 ## Attendee directory import

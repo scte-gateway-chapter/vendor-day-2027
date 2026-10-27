@@ -483,6 +483,12 @@ you have verified the push arrived.
 
 ## Known limitations
 
+- **Browser compatibility floor.** The app shell polyfills
+  `crypto.randomUUID` (via `public/js/polyfills.js` on the page and an
+  inline block at the top of `public/sw.js` for the service worker), so
+  the effective minimum requirement is any browser that exposes
+  `crypto.getRandomValues` — universal in HTTPS contexts since ~2015.
+  Older browsers without that method cannot run the app regardless.
 - **iOS web push reliability.** Delivery on iOS depends heavily on the
   installed PWA state, screen-on state, and the specific iOS version /
   device. The chapter has observed some iPhones that stop receiving
