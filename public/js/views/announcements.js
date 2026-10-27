@@ -42,6 +42,7 @@ import { renderMarkdown } from "../markdown-mini.js";
 import {
   getSubscriptionState,
   requestPermissionAndSubscribe,
+  unsubscribeFromPush,
   addPermissionListener,
 } from "../onesignal.js";
 
@@ -49,6 +50,13 @@ const DECISION_KEY = "vendorday2027.push.decision";
 const LAST_VIEWED_KEY = "vendorday2027.announcements.lastViewedAt";
 const DEFAULT_LAST_VIEWED = "1970-01-01T00:00:00Z";
 const HIGHLIGHT_DURATION_MS = 2000;
+
+// Guardrail for the Enable Notifications flow: if the SDK call hasn't
+// resolved after this long, we surface an inline error instead of
+// leaving the button in a dim/busy state forever. 15s is long enough to
+// cover a user hesitating on the native OS prompt (Chrome blocks the
+// Promise until the user chooses) while still catching an SDK hang.
+const SUBSCRIBE_TIMEOUT_MS = 15000;
 
 /** Module-level cleanup slot. Set at the end of each render call. */
 let __cleanup = null;
@@ -287,6 +295,19 @@ function buildStickyHeader() {
  * Render the top-of-view opt-in card variant (or nothing) and the
  * subtle denied banner (or nothing) based on the current subscription
  * state and prior decision. Rerenders itself after any user action.
+ *
+ * State → UI mapping:
+ *   denied                 → persistent "notifications off" strip in deniedHost
+ *   granted                → "✓ Notifications on" subscribed card with a
+ *                            muted "Turn off notifications" affordance.
+ *                            Rendered unconditionally so the user can
+ *                            always see current status and reverse it,
+ *                            regardless of any prior dismiss decision.
+ *   ios-install-required   → iOS install guidance card (unless prior
+ *                            decision suppresses it)
+ *   not-prompted           → "Enable notifications" card (unless prior
+ *                            decision suppresses it)
+ *   unsupported            → nothing
  */
 async function renderOptInSlot(optInHost, deniedHost) {
   const state = await getSubscriptionState();
@@ -308,9 +329,24 @@ async function renderOptInSlot(optInHost, deniedHost) {
     return;
   }
 
-  // Hide the opt-in card if a decision was already recorded or the
-  // browser's own state is terminal (granted / denied / unsupported).
-  if (priorDecision || state === "granted" || state === "unsupported") {
+  // Device is actively subscribed. Make the current state visible (so
+  // users across age ranges don't wonder whether they already enabled
+  // it) and give them one explicit way to opt back out from inside the
+  // app. This is the ONLY place in the view that is allowed to invoke
+  // optOut; the Enable path never touches it.
+  if (state === "granted") {
+    optInHost.appendChild(buildSubscribedCard(optInHost, deniedHost));
+    return;
+  }
+
+  if (state === "unsupported") {
+    return;
+  }
+
+  // Suppress the first-time prompt / install guidance if the user has
+  // already made a decision on a prior visit. "granted" above renders
+  // regardless of priorDecision because it reflects real device state.
+  if (priorDecision) {
     return;
   }
 
@@ -340,13 +376,28 @@ function buildSupportedOptInCard(optInHost, deniedHost) {
       <button type="button" class="btn-primary" data-action="enable">Enable notifications</button>
       <button type="button" class="btn-secondary" data-action="dismiss">Not now</button>
     </div>
+    <p class="push-opt-in-card__status" role="status" aria-live="polite" hidden></p>
   `;
 
-  card.querySelector("[data-action=enable]").addEventListener("click", async (ev) => {
+  const enableBtn = card.querySelector("[data-action=enable]");
+  const dismissBtn = card.querySelector("[data-action=dismiss]");
+  const statusEl = card.querySelector(".push-opt-in-card__status");
+
+  enableBtn.addEventListener("click", async (ev) => {
     const btn = ev.currentTarget;
+    // Guard against double-tap re-entry on top of the natural "disabled"
+    // visual: an already-busy button must not kick off a second optIn.
+    if (btn.disabled) return;
     btn.disabled = true;
+    btn.setAttribute("aria-busy", "true");
+    hideStatus(statusEl);
+
     try {
-      const result = await requestPermissionAndSubscribe();
+      const result = await withTimeout(
+        requestPermissionAndSubscribe(),
+        SUBSCRIBE_TIMEOUT_MS,
+        "subscribe-timeout",
+      );
       if (result === "granted") {
         writeDecision("granted");
         ui.toast("success", "Notifications enabled.");
@@ -358,21 +409,40 @@ function buildSupportedOptInCard(optInHost, deniedHost) {
         // No decision recorded; the opt-in simply hides because the slot
         // will see "unsupported" on next render.
       } else {
-        // "default" — user dismissed the native prompt without choosing.
+        // "default" / "not-prompted" — the SDK returned without a
+        // definitive outcome (user dismissed the native prompt without
+        // choosing, or the SDK silently no-op'd). Record "dismissed" so
+        // the first-visit prompt doesn't re-nag.
         writeDecision("dismissed");
       }
     } catch (err) {
-      console.warn("[announcements] requestPermissionAndSubscribe failed:", err);
-      ui.toast("error", "Couldn't enable notifications. Try again from About & Install.");
+      if (err && err.message === "subscribe-timeout") {
+        console.warn(
+          "[announcements] subscribe did not resolve within",
+          SUBSCRIBE_TIMEOUT_MS,
+          "ms",
+        );
+        showStatus(
+          statusEl,
+          "That didn't go through. Check your browser's notification settings and try again.",
+        );
+      } else {
+        console.warn("[announcements] requestPermissionAndSubscribe failed:", err);
+        showStatus(
+          statusEl,
+          "Couldn't enable notifications. Try again, or open About & Install for help.",
+        );
+      }
     } finally {
       btn.disabled = false;
+      btn.removeAttribute("aria-busy");
       renderOptInSlot(optInHost, deniedHost).catch((err) =>
         console.warn("[announcements] opt-in rerender failed:", err),
       );
     }
   });
 
-  card.querySelector("[data-action=dismiss]").addEventListener("click", () => {
+  dismissBtn.addEventListener("click", () => {
     writeDecision("dismissed");
     renderOptInSlot(optInHost, deniedHost).catch((err) =>
       console.warn("[announcements] opt-in rerender failed:", err),
@@ -380,6 +450,116 @@ function buildSupportedOptInCard(optInHost, deniedHost) {
   });
 
   return card;
+}
+
+/**
+ * Subscribed-state card. Reuses the shared `.push-opt-in-card` chrome so
+ * the visual vocabulary matches the Enable variant without introducing
+ * new styling. The status line is prose rather than a button so screen
+ * readers announce it as live content; the Turn-off control is a muted
+ * secondary button sitting below it. Clicking Turn off is the ONE path
+ * in the attendee shell that calls `unsubscribeFromPush` → `optOut()`.
+ */
+function buildSubscribedCard(optInHost, deniedHost) {
+  const card = document.createElement("section");
+  card.className = "push-opt-in-card";
+  card.setAttribute("role", "region");
+  card.setAttribute("aria-label", "Notification settings");
+  card.innerHTML = `
+    <h3 class="push-opt-in-card__title">
+      <span aria-hidden="true">\u2713</span> Notifications are on
+    </h3>
+    <p class="push-opt-in-card__body">
+      You'll receive schedule changes and announcements on this device.
+    </p>
+    <div class="push-opt-in-card__actions">
+      <button type="button" class="btn-secondary" data-action="turn-off">Turn off notifications</button>
+    </div>
+    <p class="push-opt-in-card__status" role="status" aria-live="polite" hidden></p>
+  `;
+
+  const turnOffBtn = card.querySelector("[data-action=turn-off]");
+  const statusEl = card.querySelector(".push-opt-in-card__status");
+
+  turnOffBtn.addEventListener("click", async (ev) => {
+    const btn = ev.currentTarget;
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.setAttribute("aria-busy", "true");
+    hideStatus(statusEl);
+
+    try {
+      const result = await withTimeout(
+        unsubscribeFromPush(),
+        SUBSCRIBE_TIMEOUT_MS,
+        "unsubscribe-timeout",
+      );
+      // After opt-out the device transitions to permission=granted +
+      // optedIn=false, which getSubscriptionState normalizes to
+      // "not-prompted". Clear any prior decision so the Enable card
+      // can offer re-subscribe on the next render.
+      if (result !== "granted") {
+        clearDecision();
+        ui.toast("info", "Notifications turned off.");
+      }
+    } catch (err) {
+      if (err && err.message === "unsubscribe-timeout") {
+        console.warn(
+          "[announcements] unsubscribe did not resolve within",
+          SUBSCRIBE_TIMEOUT_MS,
+          "ms",
+        );
+        showStatus(
+          statusEl,
+          "Couldn't turn off notifications right now. Try again in a moment.",
+        );
+      } else {
+        console.warn("[announcements] unsubscribeFromPush failed:", err);
+        showStatus(
+          statusEl,
+          "Couldn't turn off notifications. Try again, or disable them in your device settings.",
+        );
+      }
+    } finally {
+      btn.disabled = false;
+      btn.removeAttribute("aria-busy");
+      renderOptInSlot(optInHost, deniedHost).catch((err) =>
+        console.warn("[announcements] opt-in rerender failed:", err),
+      );
+    }
+  });
+
+  return card;
+}
+
+/* ---------------- Opt-in helpers ---------------- */
+
+/**
+ * Race a promise against a timeout. On timeout the returned promise
+ * rejects with an Error carrying `message === label`, which the caller
+ * uses to branch on timeout vs genuine failure. The timer is cleared on
+ * the happy path so we don't leak a pending setTimeout.
+ */
+function withTimeout(promise, ms, label) {
+  let timer = null;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer !== null) clearTimeout(timer);
+  });
+}
+
+function showStatus(el, message) {
+  if (!el) return;
+  el.textContent = message;
+  el.hidden = false;
+}
+
+function hideStatus(el) {
+  if (!el) return;
+  el.textContent = "";
+  el.hidden = true;
 }
 
 function buildIosInstallCard(optInHost, deniedHost) {
@@ -580,6 +760,14 @@ function writeDecision(value) {
     localStorage.setItem(DECISION_KEY, value);
   } catch (err) {
     console.warn("[announcements] decision write failed:", err);
+  }
+}
+
+function clearDecision() {
+  try {
+    localStorage.removeItem(DECISION_KEY);
+  } catch (err) {
+    console.warn("[announcements] decision clear failed:", err);
   }
 }
 

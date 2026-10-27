@@ -1515,6 +1515,19 @@ a:focus-visible {
   min-width: 10rem;
 }
 
+/* Inline live region for subscribe/unsubscribe errors + timeouts.
+   `role="status"` + `aria-live="polite"` is wired on the element itself;
+   this rule just gives the message its own line below the actions and
+   borrows the error palette tokens so timeout/failure text reads as a
+   problem without needing a separate status-error wrapper. */
+.push-opt-in-card__status {
+  margin: var(--space-sm) 0 0;
+  color: var(--error-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+.push-opt-in-card__status[hidden] { display: none; }
+
 /* iOS variant: slightly different accent so the different intent (routes
    to install docs instead of prompting) reads at a glance. */
 .push-opt-in-card--ios {

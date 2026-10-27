@@ -13,10 +13,10 @@ importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
  * constants and the standalone `BUILD_ID` string at build time. On the
  * next deploy, `activate` deletes caches whose names don't match the
  * current triple so stale shell / content / image bytes are reclaimed. */
-const BUILD_ID = "1793131839146";
-const SHELL_CACHE = "shell-v1793131839146";
-const CONTENT_CACHE = "content-v1793131839146";
-const IMAGES_CACHE = "images-v1793131839146";
+const BUILD_ID = "1793134854198";
+const SHELL_CACHE = "shell-v1793134854198";
+const CONTENT_CACHE = "content-v1793134854198";
+const IMAGES_CACHE = "images-v1793134854198";
 
 /* ---------------- Pre-cache manifest ----------------
  * `scripts/build-sw.js` walks `public/` at build time and rewrites the

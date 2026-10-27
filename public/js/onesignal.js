@@ -266,13 +266,32 @@ export async function getSubscriptionState() {
 /* ---------------- Request permission + subscribe ---------------- */
 
 /**
- * Trigger the browser permission prompt and register the subscription
- * with OneSignal. Terminal states short-circuit without acting; the only
- * state that invokes the SDK's prompt is `"not-prompted"`.
+ * Register (or re-register) this browser's push subscription with
+ * OneSignal. Terminal states short-circuit without acting; the only
+ * state that invokes the SDK is `"not-prompted"`.
  *
- * After the SDK prompt resolves, we re-query `getSubscriptionState()`
- * and return that so the Announcements opt-in card can branch on the
- * same five-state enum it uses everywhere else.
+ * Implementation note (bug fix, 2026-10-28): this previously called
+ * `OneSignal.Notifications.requestPermission()`, which per the Web SDK
+ * v16 reference only requests OS-level notification permission — it
+ * does NOT create or restore the OneSignal push subscription. On a
+ * device whose OneSignal `optedIn` flag was `false` (e.g., a previous
+ * SDK run marked the subscription unsubscribed, or the device had a
+ * stale push token after a factory reset), tapping "Enable" produced
+ * no OS prompt (permission was already granted) and no subscription
+ * change, leaving the dashboard showing "Unsubscribed". We now call
+ * `OneSignal.User.PushSubscription.optIn()` explicitly, which per the
+ * same v16 reference either (a) sets the subscription status to
+ * subscribed when a valid push token exists, or (b) attempts to show
+ * the OS permission prompt when it doesn't — a single
+ * gesture-preserving call that handles both the first-time grant and
+ * the re-subscribe-after-optOut paths. The iOS 16.4+ gesture concern
+ * that motivated the previous implementation is still satisfied because
+ * `optIn()` combines the OS prompt and the subscription registration
+ * into one SDK method call.
+ *
+ * After the SDK call resolves, we re-query `getSubscriptionState()` and
+ * return that so the Announcements opt-in card can branch on the same
+ * five-state enum it uses everywhere else.
  *
  * Fallback: if the SDK is unavailable (missing app id, script load
  * failed) but `Notification.requestPermission` exists, we call it
@@ -293,18 +312,9 @@ export async function requestPermissionAndSubscribe() {
     return state;
   }
 
-  // state === "not-prompted".
-  //
-  // Prefer OneSignal's `OneSignal.Notifications.requestPermission()`. On
-  // iOS 16.4+ standalone PWAs, splitting the OS prompt and the push
-  // subscription registration across two separate calls (native
-  // Notification.requestPermission() + a later OneSignal.optIn()) loses
-  // the user-gesture context between the two, so Apple accepts the OS
-  // permission grant but OneSignal never actually registers a working
-  // push endpoint. OneSignal's own method combines both steps into one
-  // gesture-preserving call, which is what iOS requires. We await SDK
-  // readiness first (init is kicked off by app.js on window.load, so it
-  // should already be settled by the time the user taps Enable).
+  // state === "not-prompted". Await SDK readiness first; init is kicked
+  // off by app.js on window.load so it should already be settled by the
+  // time the user taps Enable, but defend against a slow CDN.
   if (!sdkReady) initOneSignal();
   try {
     await Promise.race([
@@ -320,13 +330,14 @@ export async function requestPermissionAndSubscribe() {
   if (
     !sdkUnavailable &&
     oneSignalNS &&
-    oneSignalNS.Notifications &&
-    typeof oneSignalNS.Notifications.requestPermission === "function"
+    oneSignalNS.User &&
+    oneSignalNS.User.PushSubscription &&
+    typeof oneSignalNS.User.PushSubscription.optIn === "function"
   ) {
     try {
-      await oneSignalNS.Notifications.requestPermission();
+      await oneSignalNS.User.PushSubscription.optIn();
     } catch (err) {
-      console.warn("[onesignal] SDK requestPermission failed:", err);
+      console.warn("[onesignal] PushSubscription.optIn failed:", err);
     }
     return await getSubscriptionState();
   }
@@ -347,6 +358,48 @@ export async function requestPermissionAndSubscribe() {
     console.warn("[onesignal] native requestPermission fallback failed:", err);
     return "denied";
   }
+}
+
+/* ---------------- Unsubscribe ---------------- */
+
+/**
+ * Opt the current browser out of OneSignal push notifications. This is
+ * the ONLY path in the attendee shell that calls `optOut()` — intended
+ * exclusively for a user-initiated "Turn off notifications" affordance.
+ * The OS-level permission state is left untouched; the user can later
+ * re-enable via the same opt-in flow without re-granting permission.
+ *
+ * Resolves with the normalized subscription state after the opt-out, so
+ * callers can rerender off the same five-state enum they use elsewhere.
+ *
+ * @returns {Promise<"granted"|"denied"|"default"|"ios-install-required"|"unsupported"|"not-prompted">}
+ */
+export async function unsubscribeFromPush() {
+  if (!sdkReady) initOneSignal();
+  try {
+    await Promise.race([
+      sdkReady,
+      new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("SDK init timeout")), 5000),
+      ),
+    ]);
+  } catch (_err) {
+    /* non-fatal; the state query below still returns something sensible */
+  }
+  if (
+    !sdkUnavailable &&
+    oneSignalNS &&
+    oneSignalNS.User &&
+    oneSignalNS.User.PushSubscription &&
+    typeof oneSignalNS.User.PushSubscription.optOut === "function"
+  ) {
+    try {
+      await oneSignalNS.User.PushSubscription.optOut();
+    } catch (err) {
+      console.warn("[onesignal] PushSubscription.optOut failed:", err);
+    }
+  }
+  return await getSubscriptionState();
 }
 
 /* ---------------- Listeners ---------------- */
