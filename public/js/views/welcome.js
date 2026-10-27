@@ -10,6 +10,7 @@
 "use strict";
 
 import { initFirestore, getDoc } from "../firebase.js";
+import { loadAppSettings, isSignInEnabled } from "../app-settings.js";
 import * as router from "../router.js";
 import { getLastSignIn } from "./signin.js";
 
@@ -39,6 +40,12 @@ export async function renderWelcome(host, opts = {}) {
     return;
   }
 
+  // Prime the shared appSettings cache so `isSignInEnabled()` is accurate
+  // when we decide whether to render the Sign-In CTA below. The call is
+  // cached across the session; this is a no-op after app.js's bootstrap
+  // prime has resolved.
+  try { await loadAppSettings(); } catch (_err) { /* fail-closed */ }
+
   host.innerHTML = "";
 
   const heroCard = document.createElement("section");
@@ -62,8 +69,12 @@ export async function renderWelcome(host, opts = {}) {
   // a secondary action beneath the headline without competing with the
   // install prompt for the primary click. If the attendee has already
   // signed in on this device, it swaps to the shared `.signin-indicator`
-  // treatment that mirrors the Home card.
-  host.append(buildWelcomeSignInCta());
+  // treatment that mirrors the Home card. Both renderings are gated
+  // behind the admin `signInEnabled` toggle so the CTA stays invisible
+  // until the board opens sign-in close to event start.
+  if (isSignInEnabled()) {
+    host.append(buildWelcomeSignInCta());
+  }
 
   const installCard = document.createElement("section");
   installCard.className = "card welcome-install-card";

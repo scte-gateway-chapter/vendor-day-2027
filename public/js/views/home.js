@@ -16,6 +16,7 @@
 "use strict";
 
 import { initFirestore, getDoc, getCollection, onSnapshot } from "../firebase.js";
+import { loadAppSettings, isSignInEnabled } from "../app-settings.js";
 import * as router from "../router.js";
 import * as ui from "../ui.js";
 import { registerViewCleanup } from "../app.js";
@@ -38,6 +39,11 @@ export async function renderHome(host) {
   // Re-renders (retry buttons, hot-reload during dev) clear any prior cleanup
   // so we never leave two agenda pollers running against the same view root.
   runCleanup();
+
+  // Prime the shared appSettings cache so `isSignInEnabled()` is accurate
+  // when buildQuickActions() decides whether to render the Sign-In quick
+  // action. Cached across the session; no-op once app.js has primed it.
+  try { await loadAppSettings(); } catch (_err) { /* fail-closed */ }
 
   host.innerHTML = "";
 
@@ -420,9 +426,25 @@ function buildQuickActions() {
   // indicator can span the full first row at wide viewports; the three
   // navigation buttons fall into row 2. On narrow viewports every cell is
   // full-width so the span rule is a no-op.
-  const signedIn = getLastSignIn();
+  //
+  // The whole Sign-In quick-action (both the default CTA and the
+  // "You're signed in" prominent indicator) is gated behind the admin
+  // `signInEnabled` toggle. When the toggle is off the quick-action is
+  // omitted entirely and the grid falls back to its default 3-column
+  // Agenda / Venue map / Sponsors layout — even for attendees with a
+  // stored prior submission. The `#/sign-in` route itself still shows
+  // their confirmation card for the record.
+  const signInEnabled = isSignInEnabled();
+  const signedIn = signInEnabled ? getLastSignIn() : null;
 
-  if (signedIn) {
+  if (!signInEnabled) {
+    el.className = "home-quick-actions";
+    el.innerHTML = `
+      <button type="button" class="btn-secondary" data-target="#/agenda">Agenda</button>
+      <button type="button" class="btn-secondary" data-target="#/map">Venue map</button>
+      <button type="button" class="btn-secondary" data-target="#/sponsors">Sponsors</button>
+    `;
+  } else if (signedIn) {
     el.className = "home-quick-actions home-quick-actions--signed-in";
     el.innerHTML = `
       <button

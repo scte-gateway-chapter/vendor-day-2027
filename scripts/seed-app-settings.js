@@ -78,6 +78,11 @@ async function main() {
     venueMapUrl: null,
     venueMapCaption:
       "Doubletree Chesterfield Exhibit Hall — final map will be posted before the event.",
+    // Attendee Sign-In surfaces (Welcome CTA, Home quick-action, More
+    // menu entry, #/sign-in route) are gated behind this flag. Default
+    // false so a fresh seed hides sign-in until an admin flips the
+    // toggle on from the admin Settings page close to event start.
+    signInEnabled: false,
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: "seed-script",
   };

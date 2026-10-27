@@ -196,6 +196,7 @@ The app's year is baked in — 2027. Each future year gets a fresh deployment un
 7. WHEN sign-in records are created THEN the system SHALL NOT write them to any Firestore collection; the Google Sheet (reached via Zapier) is the single source of truth, and Office Location SHALL NOT be surfaced in the attendee directory view.
 8. WHEN the Sign-In view is reachable THEN the system SHALL expose a Sign-In entry point from three locations: a prominent card on the Home view, a prominent CTA on the Welcome / Install view (below the hero and above the install card), and an entry at the top of the overflow menu in the app header.
 9. WHEN a prior sign-in submission is stored on the device THEN the Home and Welcome Sign-In entry points SHALL display a high-contrast confirmation using the shared success palette, showing a check icon, a bold "You're signed in" line, the stored attendee name, and a muted "Tap to update" hint; both treatments SHALL remain clickable and SHALL route to `#/sign-in` so the attendee can reach the view and reset.
+10. IF `signInEnabled` is false in `appSettings/singleton` (the fail-closed default — missing, false, or any non-true value) THEN the Welcome CTA, the Home quick-action, the More menu entry, and the Sign-In form on the `#/sign-in` route SHALL all be hidden. The `#/sign-in` route SHALL render a friendly "Sign-in isn't available yet" placeholder for new attendees, OR the stored confirmation card (without the "Sign in as someone else" reset button) for attendees with a prior submission on this device. The admin flips `signInEnabled` through the admin Settings page; the attendee app picks up the new value on the next refresh / launch (no live Firestore listener).
 
 ## Resolved Decisions
 
@@ -214,6 +215,7 @@ The following decisions have been confirmed by the user and are locked for desig
 - **In-app sign-in intake**: The in-app Sign-In view and the public GoDaddy sign-in page both POST to the same Zapier Catch Hook, which writes rows into a single shared Google Sheet. The webhook URL is deployed as the Cloudflare env var `ZAPIER_SIGNIN_WEBHOOK_URL` and exposed to the client through `/api/config` as `signInWebhookUrl` — no hardcoded URL in the app. Sign-ins are not written to any Firestore collection; the Google Sheet is the source of truth.
 - **Office Location field**: Captured by the Sign-In form and sent to the Sheet, but intentionally not surfaced in the in-app attendee directory.
 - **Sign-in spam protection**: Client-side validation only, matching the GoDaddy form. No honeypot, no CAPTCHA.
+- **Attendee Sign-In admin gate**: The in-app Sign-In surfaces (Welcome CTA, Home quick-action, More menu entry, and the `#/sign-in` route itself) are gated behind a `signInEnabled` boolean on `appSettings/singleton`. Default is `false` (fail-closed — a missing or non-true value is treated as off), and the attendee app picks up admin changes on the next refresh / launch (no live listener). Admins flip the toggle from the admin Settings page. The gate only governs in-app surfaces; the GoDaddy sign-in page is independent and keeps its own availability controls.
 
 ## Confirmed Context
 

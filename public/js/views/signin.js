@@ -22,6 +22,8 @@
 "use strict";
 
 import { initFirestore } from "../firebase.js";
+import { loadAppSettings, isSignInEnabled } from "../app-settings.js";
+import * as router from "../router.js";
 import * as ui from "../ui.js";
 import { registerViewCleanup } from "../app.js";
 import { relativeTime } from "../utils/time.js";
@@ -56,10 +58,31 @@ export async function renderSignIn(host) {
   // with the other views.
   registerViewCleanup(() => {});
 
+  // Admin gate: `signInEnabled` on appSettings/singleton controls whether
+  // the Sign-In form is open to attendees. The toggle is fail-closed —
+  // when the fetch fails or the field is missing it stays off. Prime the
+  // shared cache first so the check below reflects the latest write.
+  try { await loadAppSettings(); } catch (_err) { /* fail-closed */ }
+  const prior = readLastSubmission();
+
+  if (!isSignInEnabled()) {
+    // Deep-link / bookmark reached #/sign-in while the admin has sign-in
+    // turned off. Attendees with a prior stored submission see their
+    // confirmation card as a read-only informational state (no "Sign in
+    // as someone else" reset, because re-signing isn't allowed while
+    // disabled). Everyone else sees a friendly "not available yet"
+    // placeholder.
+    if (prior) {
+      renderConfirmationCard(body, prior, { readOnly: true });
+    } else {
+      renderDisabledPlaceholder(body);
+    }
+    return;
+  }
+
   // Short-circuit if this device has already signed in — the terminal state
   // is a confirmation card, not the form. The reset link rewrites to the
   // form state inline.
-  const prior = readLastSubmission();
   if (prior) {
     renderConfirmationCard(body, prior);
     return;
@@ -429,7 +452,17 @@ async function postFormEncoded(url, payload) {
 
 /* ---------------- Confirmation card ---------------- */
 
-function renderConfirmationCard(host, record) {
+/**
+ * Render the "You're signed in" confirmation card. When `readOnly` is
+ * true the "Sign in as someone else" reset button is omitted — used when
+ * the admin has turned sign-in off but the attendee has a prior
+ * submission on this device, so the card is informational only.
+ * @param {HTMLElement} host
+ * @param {{ name: string, company: string, submittedAt: string }} record
+ * @param {{ readOnly?: boolean }} [opts]
+ */
+function renderConfirmationCard(host, record, opts = {}) {
+  const { readOnly = false } = opts;
   const when = relativeTime(record.submittedAt);
   const whenLabel = when ? `Signed in ${when}` : "Signed in";
   const nameLine = record.company
@@ -444,9 +477,14 @@ function renderConfirmationCard(host, record) {
       <p class="signin-confirmation-card__body">
         Your sign-in has been recorded. Enjoy the show.
       </p>
+      ${
+        readOnly
+          ? ""
+          : `
       <div class="signin-confirmation-card__actions">
         <button type="button" class="btn-secondary" data-action="reset">Sign in as someone else</button>
-      </div>
+      </div>`
+      }
     </section>
   `;
   const btn = host.querySelector('[data-action="reset"]');
@@ -458,6 +496,32 @@ function renderConfirmationCard(host, record) {
       // var has since been cleared).
       const container = host.parentElement; // #view-root
       if (container) await renderSignIn(container);
+    });
+  }
+}
+
+/**
+ * Friendly placeholder shown on `#/sign-in` when the admin has not yet
+ * flipped `signInEnabled` on. Deep-link / bookmark gap closer: without
+ * this, an attendee reaching the route before sign-in opens would see
+ * the form (which would then POST a submission). Reuses the shared
+ * `.placeholder-card` empty-state styling so the view matches the rest
+ * of the "coming soon" surfaces in the app.
+ * @param {HTMLElement} host
+ */
+function renderDisabledPlaceholder(host) {
+  host.innerHTML = `
+    <section class="placeholder-card" aria-live="polite">
+      <h2>Sign-in isn't available yet</h2>
+      <p>Check back closer to the event.</p>
+      <button type="button" class="btn-secondary" data-action="home">Back to Home</button>
+    </section>
+  `;
+  const btn = host.querySelector('[data-action="home"]');
+  if (btn) {
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      router.navigate("/home");
     });
   }
 }

@@ -24,6 +24,7 @@ import renderAnnouncementsComposer from "./announcements-composer.js";
 import renderAttendeesImporter from "./attendees-importer.js";
 import renderFeedbackEditor from "./feedback-editor.js";
 import renderRecapEditor from "./recap-editor.js";
+import renderSettingsEditor from "./settings-editor.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
@@ -42,7 +43,7 @@ const PROTECTED_ROUTES = [
   { slug: "attendees", label: "Admin Attendees", taskLabel: "Task 22" },
   { slug: "feedback", label: "Admin Feedback", taskLabel: "Task 23" }, // replaced by renderFeedbackEditor below
   { slug: "recap", label: "Admin Recap", taskLabel: "Task 24" }, // replaced by renderRecapEditor below
-  { slug: "settings", label: "Admin Settings", taskLabel: "a later task" },
+  { slug: "settings", label: "Admin Settings", taskLabel: "Attendee Sign-In toggle" }, // replaced by renderSettingsEditor below
 ];
 
 /* ----------------- Per-view cleanup registry ----------------- */
@@ -271,6 +272,23 @@ function handleRecapRoute() {
   syncPhoneDropdown("recap");
 }
 
+function handleSettingsRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderSettingsEditor(host)
+      .catch((err) => {
+        console.warn("[admin] settings editor render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
+  }
+  syncPhoneDropdown("settings");
+}
+
 function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
@@ -302,6 +320,7 @@ function registerRoutes() {
   router.register("#/attendees", handleAttendeesRoute);
   router.register("#/feedback", handleFeedbackRoute);
   router.register("#/recap", handleRecapRoute);
+  router.register("#/settings", handleSettingsRoute);
   for (const route of PROTECTED_ROUTES) {
     if (
       route.slug === "dashboard" ||
@@ -311,7 +330,8 @@ function registerRoutes() {
       route.slug === "announcements" ||
       route.slug === "attendees" ||
       route.slug === "feedback" ||
-      route.slug === "recap"
+      route.slug === "recap" ||
+      route.slug === "settings"
     ) continue;
     router.register(`#/${route.slug}`, () =>
       handleProtectedRoute(route.slug, route.label, route.taskLabel),

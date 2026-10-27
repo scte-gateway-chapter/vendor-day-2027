@@ -544,3 +544,60 @@ and listing someone in the directory does NOT mark them as signed in.
 Office Location is intentionally captured only on the Sign-In form —
 it is a Sheet-only field and does not appear anywhere in the directory
 view.
+
+### Enabling and disabling attendee Sign-In
+
+The in-app Sign-In surfaces (Welcome CTA, Home quick-action, More menu
+entry, and the `#/sign-in` route itself) are gated behind an admin
+toggle so the board can keep sign-in invisible during event setup and
+flip it on close to door-open. The toggle lives on the admin Settings
+page.
+
+**To flip the toggle:**
+
+1. Admin → **Settings** in the left rail (or the phone navigation
+   dropdown).
+2. Under **Attendee Sign-In**, tap the switch.
+   - **LIVE** means attendees see the Sign-In form on the Welcome
+     screen, Home, and the More menu, and `#/sign-in` renders the
+     form.
+   - **OFF** means attendees see no Sign-In surface anywhere in the
+     app, and `#/sign-in` (if an attendee reaches it from a
+     bookmark or deep link) renders a "Sign-in isn't available yet"
+     placeholder instead of the form.
+3. A success toast confirms the write. The small `updated X ago by Y`
+   line in the Settings header updates on the next 30-second poll.
+
+**When attendees see the change:** on the next refresh or launch of
+the app. The attendee app does NOT poll for this flag — the design
+reads `appSettings/singleton` once per page load, so an attendee who
+had the app open when you flipped the toggle will keep seeing the
+previous state until they reload or relaunch.
+
+**Behavior for attendees who already signed in before you turned the
+toggle off:** The Welcome CTA, Home quick-action, and More menu entry
+all stay hidden regardless of local state — the chrome does not
+reveal the gated feature. If one of those attendees navigates
+directly to `#/sign-in` (e.g., from a bookmark), the view renders the
+`Signed in as [name] ([company])` confirmation card for their
+reassurance, but **without** the "Sign in as someone else" reset
+button since re-signing is not offered while sign-in is off.
+
+**Recommended operational pattern:** leave the toggle **OFF** during
+all pre-event setup, back-of-house walkthroughs, and admin smoke
+tests so stray test submissions don't land in the Google Sheet from
+staff who happen to tap around the installed PWA. Flip it **LIVE** on
+the morning of the event, roughly 30 minutes before door-open, so the
+earliest attendees who already have the app on their phones see the
+Sign-In entry when they open it at check-in. Flip it back **OFF**
+after the sign-in rush subsides if the board wants to prevent late or
+duplicate submissions.
+
+**The GoDaddy page is NOT affected by this toggle.** It is the
+chapter's public web form and keeps whatever availability controls
+the GoDaddy site itself provides. If a pre-event blackout is desired,
+hide the GoDaddy page separately through the chapter's GoDaddy site
+settings. The two intake paths share one Zapier Catch Hook and one
+Google Sheet, but their visibility is managed independently so the
+board can run back-of-house tests against the GoDaddy page while the
+in-app surface stays hidden.

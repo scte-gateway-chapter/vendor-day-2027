@@ -3328,3 +3328,75 @@ body.admin-modal-open {
     width: 100%;
   }
 }
+
+/* =================================================================
+ * Settings editor (admin Attendee Sign-In toggle)
+ * ================================================================= */
+
+/* Sticky secondary header — matches the Agenda / Sponsors / Map /
+   Announcements / Feedback / Recap editor headers. */
+.admin-settings-header {
+  position: sticky;
+  top: var(--header-height);
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-settings-header__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+.admin-settings-header__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+.admin-settings-header__meta {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+}
+
+.admin-settings-editor__panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding-top: var(--space-md);
+}
+
+.admin-settings-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.admin-settings-section__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--body-text);
+  line-height: var(--line-height-md);
+}
+.admin-settings-section__helper {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+
+/* The toggle itself reuses .admin-feedback-toggle for the full switch
+   chrome (track, thumb, pill, copy, banner). This marker class is here
+   so a future settings-only override can hook in without touching the
+   shared Feedback classes. */
+.admin-settings-toggle { /* no overrides today */ }
+
+.admin-settings-toggle-skeleton {
+  min-height: 96px;
+}

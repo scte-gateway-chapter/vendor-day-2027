@@ -13,17 +13,17 @@ importScripts("https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.sw.js");
  * constants and the standalone `BUILD_ID` string at build time. On the
  * next deploy, `activate` deletes caches whose names don't match the
  * current triple so stale shell / content / image bytes are reclaimed. */
-const BUILD_ID = "1793115538294";
-const SHELL_CACHE = "shell-v1793115538294";
-const CONTENT_CACHE = "content-v1793115538294";
-const IMAGES_CACHE = "images-v1793115538294";
+const BUILD_ID = "1793131839146";
+const SHELL_CACHE = "shell-v1793131839146";
+const CONTENT_CACHE = "content-v1793131839146";
+const IMAGES_CACHE = "images-v1793131839146";
 
 /* ---------------- Pre-cache manifest ----------------
  * `scripts/build-sw.js` walks `public/` at build time and rewrites the
  * array literal between the START/END markers with the real list of
  * shell assets. First-run (before the build) stays an empty array so the
  * file parses — install will no-op in that case. */
-const PRECACHE_MANIFEST = /* PRECACHE_MANIFEST_START */ ["/","/admin/","/admin/css/admin.css","/admin/index.html","/admin/js/admin-auth.js","/admin/js/admin-fetch.js","/admin/js/admin.js","/admin/js/agenda-editor.js","/admin/js/announcements-composer.js","/admin/js/attendees-importer.js","/admin/js/collision-check.js","/admin/js/csv-parse.js","/admin/js/dashboard.js","/admin/js/feedback-editor.js","/admin/js/login.js","/admin/js/map-uploader.js","/admin/js/recap-editor.js","/admin/js/sponsors-editor.js","/assets/brand/gateway-logo.png","/assets/brand/gateway-logo.svg","/assets/icons/icon-192.png","/assets/icons/icon-512.png","/assets/icons/icon-maskable-512.png","/assets/placeholders/logo-placeholder.svg","/assets/placeholders/venue-map-placeholder.svg","/css/app.css","/index.html","/js/app.js","/js/firebase.js","/js/markdown-mini.js","/js/onesignal.js","/js/router.js","/js/ui.js","/js/utils/focus-trap.js","/js/utils/time.js","/js/views/agenda-detail.js","/js/views/agenda.js","/js/views/announcements.js","/js/views/attendees-detail.js","/js/views/attendees.js","/js/views/feedback.js","/js/views/home.js","/js/views/map.js","/js/views/recap.js","/js/views/signin.js","/js/views/sponsors-detail.js","/js/views/sponsors.js","/js/views/welcome.js","/manifest.webmanifest","/offline.html"] /* PRECACHE_MANIFEST_END */;
+const PRECACHE_MANIFEST = /* PRECACHE_MANIFEST_START */ ["/","/admin/","/admin/css/admin.css","/admin/index.html","/admin/js/admin-auth.js","/admin/js/admin-fetch.js","/admin/js/admin.js","/admin/js/agenda-editor.js","/admin/js/announcements-composer.js","/admin/js/attendees-importer.js","/admin/js/collision-check.js","/admin/js/csv-parse.js","/admin/js/dashboard.js","/admin/js/feedback-editor.js","/admin/js/login.js","/admin/js/map-uploader.js","/admin/js/recap-editor.js","/admin/js/settings-editor.js","/admin/js/sponsors-editor.js","/assets/brand/gateway-logo.png","/assets/brand/gateway-logo.svg","/assets/icons/icon-192.png","/assets/icons/icon-512.png","/assets/icons/icon-maskable-512.png","/assets/placeholders/logo-placeholder.svg","/assets/placeholders/venue-map-placeholder.svg","/css/app.css","/index.html","/js/app-settings.js","/js/app.js","/js/firebase.js","/js/markdown-mini.js","/js/onesignal.js","/js/router.js","/js/ui.js","/js/utils/focus-trap.js","/js/utils/time.js","/js/views/agenda-detail.js","/js/views/agenda.js","/js/views/announcements.js","/js/views/attendees-detail.js","/js/views/attendees.js","/js/views/feedback.js","/js/views/home.js","/js/views/map.js","/js/views/recap.js","/js/views/signin.js","/js/views/sponsors-detail.js","/js/views/sponsors.js","/js/views/welcome.js","/manifest.webmanifest","/offline.html"] /* PRECACHE_MANIFEST_END */;
 
 const OFFLINE_URL = "/offline.html";
 

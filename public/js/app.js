@@ -13,6 +13,7 @@
 import * as router from "./router.js";
 import * as ui from "./ui.js";
 import { initFirestore, getDoc, onSnapshot } from "./firebase.js";
+import { loadAppSettings, isSignInEnabled } from "./app-settings.js";
 import { renderWelcome } from "./views/welcome.js";
 import { renderHome } from "./views/home.js";
 import { renderAgenda } from "./views/agenda.js";
@@ -532,6 +533,21 @@ async function main() {
   // the user never navigates to #/recap. The Recap view itself still runs
   // its own 30s poll while it is mounted.
   startRecapMenuPoll();
+
+  // One-shot prime of the shared appSettings cache so attendee surfaces
+  // (Welcome CTA, Home quick-action, More menu entry, #/sign-in) can
+  // consult `isSignInEnabled()` synchronously after boot. Unlike the
+  // Recap entry we deliberately do NOT run a snapshot listener here —
+  // the design pattern for appSettings is "next refresh" propagation
+  // (see design section 16 → Admin gating). The More menu entry starts
+  // hidden (fail-closed) and this call flips it on when appropriate.
+  loadAppSettings()
+    .then(() => {
+      ui.setSignInMenuVisible(isSignInEnabled());
+    })
+    .catch(() => {
+      // Fetch already surfaced its own warning; keep Sign-In hidden.
+    });
 
   router.start();
 }

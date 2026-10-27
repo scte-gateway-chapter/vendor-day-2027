@@ -574,6 +574,45 @@ for the operational detail.
       chapter rotated the Zap at any point, this file was updated to
       match. _(Req 13.2)_
 
+- [ ] 5. **Admin Settings page shows the Sign-In toggle OFF after a
+      fresh seed.** Admin → **Settings**. The **Attendee Sign-In**
+      row renders with an **OFF** pill and the helper text explaining
+      the gated surfaces. The `updated X ago by Y` line in the header
+      resolves (seed-script or an earlier admin edit). Running `npm
+      run seed` against a fresh project produces this state. _(Req
+      13.10)_
+
+- [ ] 6. **Enabling the toggle makes the Sign-In surfaces appear on
+      next attendee refresh.** From a second browser (not already
+      installed) signed out of admin, load the production URL and
+      walk Welcome → Home → More menu. None of them show a Sign-In
+      entry while the toggle is OFF. Flip the toggle to **LIVE** from
+      the admin Settings page, then hard-refresh the attendee
+      browser (`Ctrl+Shift+R` on desktop, close-and-reopen on
+      installed PWA). The Welcome CTA (`Sign in for today`), the
+      Home Sign-In quick-action, and the More menu entry are all
+      now visible. _(Req 13.10)_
+
+- [ ] 7. **Disabling the toggle hides all four surfaces on next
+      refresh.** With the toggle LIVE from item 6, flip it back to
+      **OFF**. Hard-refresh the attendee browser from a logged-out
+      profile. The Welcome CTA, Home Sign-In quick-action, and More
+      menu entry are all hidden again. Navigate manually to
+      `#/sign-in` — the view renders the "Sign-in isn't available
+      yet" placeholder with a Back to Home button, NOT the form.
+      _(Req 13.10)_
+
+- [ ] 8. **An attendee with a stored submission still sees their
+      confirmation on `#/sign-in` after the toggle is turned off.**
+      Flip the toggle **LIVE**, open `#/sign-in` on a test device
+      (prefix the name with `TEST-RETAIN-`), submit, confirm the
+      confirmation card renders inline. Flip the toggle back **OFF**
+      and hard-refresh that same device. Navigate to `#/sign-in` —
+      the `Signed in as [name] ([company])` confirmation card
+      renders WITHOUT the "Sign in as someone else" reset button;
+      the Welcome and Home surfaces remain hidden. Delete the test
+      row from the Google Sheet after the check. _(Req 13.10)_
+
 ### Section 6a sign-off
 
 | Item | Status | Who ran it | Date | Notes |
@@ -582,6 +621,10 @@ for the operational detail.
 | 2 | | | | row id = |
 | 3 | | | | row id = |
 | 4 | | | | URL last updated = |
+| 5 | | | | |
+| 6 | | | | |
+| 7 | | | | |
+| 8 | | | | row id = |
 
 ---
 

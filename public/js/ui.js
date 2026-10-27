@@ -20,6 +20,13 @@ let adminSessionVisible = false;
 // navigation to #/recap still works while the entry is hidden; the entry
 // is just a visibility affordance in the More menu.
 let recapMenuVisible = false;
+// Sign-In menu entry is hidden by default — the one-shot `appSettings`
+// read in app.js (see app-settings.js) flips this true when
+// `signInEnabled === true`. Direct URL navigation to #/sign-in still
+// works while the entry is hidden; the Sign-In view itself gates the
+// form behind the same flag so bookmarking the route doesn't bypass
+// the admin's choice.
+let signInMenuVisible = false;
 
 /* ---------------- Header ---------------- */
 
@@ -60,7 +67,7 @@ export function renderHeader() {
         role="menu"
         hidden
       >
-        <li role="none"><a role="menuitem" href="#/sign-in">Sign In</a></li>
+        <li role="none" data-signin-only hidden><a role="menuitem" href="#/sign-in">Sign In</a></li>
         <li role="none" class="more-menu__item--recap" data-recap-only hidden><a role="menuitem" href="#/recap">Recap</a></li>
         <li role="none"><a role="menuitem" href="#/about-install">About &amp; Install</a></li>
         <li role="none" data-admin-only hidden><a role="menuitem" href="/admin">Admin</a></li>
@@ -91,6 +98,7 @@ export function renderHeader() {
 
   applyAdminVisibility(mount);
   applyRecapVisibility(mount);
+  applySignInVisibility(mount);
 }
 
 /**
@@ -126,6 +134,26 @@ function applyAdminVisibility(mount) {
 function applyRecapVisibility(mount) {
   const entry = mount.querySelector("[data-recap-only]");
   if (entry) entry.hidden = !recapMenuVisible;
+}
+
+/**
+ * Show / hide the Sign-In menu entry. Called by the one-shot appSettings
+ * read in app.js (see app-settings.js); exported here so other modules
+ * can flip it without reaching into the DOM. The entry is hidden by
+ * default (the module-level `signInMenuVisible` flag starts false) so
+ * the fail-closed admin toggle is honored even if the appSettings fetch
+ * fails or the field is absent.
+ * @param {boolean} visible
+ */
+export function setSignInMenuVisible(visible) {
+  signInMenuVisible = Boolean(visible);
+  const mount = document.getElementById("app-header");
+  if (mount) applySignInVisibility(mount);
+}
+
+function applySignInVisibility(mount) {
+  const entry = mount.querySelector("[data-signin-only]");
+  if (entry) entry.hidden = !signInMenuVisible;
 }
 
 /* ---------------- Tab bar ---------------- */
