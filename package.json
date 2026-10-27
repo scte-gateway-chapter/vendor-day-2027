@@ -11,12 +11,14 @@
     "//start": "`npx http-server` is used so a local server can run without adding a runtime dependency.",
     "start": "npx http-server public -p 8080",
     "hash-passphrase": "node scripts/hash-passphrase.js",
-    "seed": "node scripts/seed-app-settings.js"
+    "seed": "node scripts/seed-app-settings.js",
+    "qr": "node scripts/generate-qr.js"
   },
   "dependencies": {
     "jose": "^6.0.0"
   },
   "devDependencies": {
-    "firebase-admin": "^14.0.0"
+    "firebase-admin": "^14.0.0",
+    "qrcode": "^1.5.4"
   }
 }
