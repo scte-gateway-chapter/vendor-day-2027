@@ -278,6 +278,49 @@ error appears, capture the debug text via the **Copy debug text** button
 and share it with support — see **Debug overlay** below for how to
 reach the panel.
 
+#### iOS first-push warm-up
+
+After a fresh subscribe on iOS, the very first push can drop silently
+at Apple's end — the device shows no notification, no error, and no
+entry in Notification Center. Every subsequent push to the same
+subscription delivers reliably. This is **not** a bug in the app or
+the admin composer; it is an iOS Apple Push Notification Service
+quirk observed during Task 25 field testing and reproduced on more
+than one iPhone.
+
+Mitigation at venue setup: on the morning of the event, roughly 30-60
+minutes before door-open, publish an announcement in the admin
+composer with the push toggle on. A benign heading
+("Welcome to Vendor Day") and a one-line body
+("We're glad you're here — see you at check-in.") work well. This
+real-but-harmless push warms up every subscription on the roster so
+any first-push drops have already happened before the first real
+announcement goes out. If someone's phone misses this warm-up push,
+their second real push of the day still delivers.
+
+If a specific attendee reports they never got any pushes:
+
+1. Ask them to open the installed app with `?debug=1` appended to
+   the URL and expand the **🐞 DEBUG** overlay.
+2. Confirm `OneSignal.User.PushSubscription.optedIn` is **`true`** in
+   the **OneSignal state** section. If it is `false`, they are not
+   subscribed — walk them back through tapping **Enable
+   notifications** in Announcements.
+3. If `optedIn` is `true`, send another test push from the admin
+   composer (or the OneSignal dashboard **Send to Subscribed
+   Users**). The first fresh subscribe may have been dropped by the
+   warm-up quirk; the follow-up almost always lands.
+4. If a second push also fails to arrive, have the attendee **delete
+   the PWA** from their home screen, open the production URL in
+   Safari / Chrome again, re-install the PWA (Share → Add to Home
+   Screen on iOS; Install app on Android Chrome), reopen
+   Announcements, tap **Enable notifications**, and accept the
+   system prompt. Send one more test push. If the overlay then shows
+   a fresh subscription id and `optedIn: true` and the push arrives,
+   the reinstall cleared the stale state. If the push still does not
+   arrive, have them tap **Copy debug text** in the overlay and send
+   the result to the on-site admin for escalation.
+
 ---
 
 ## Attendee directory import
@@ -709,3 +752,35 @@ paste the result into whatever channel you use to reach the orchestrator
 or the dev team. The paste includes no secrets, no PII, and no
 subscription ids — just metadata about what the device thinks is going
 on. It is a safe thing to send over Slack, email, or screen-share chat.
+
+---
+
+## Known operational quirks
+
+These are not bugs in the app; they are platform or vendor behaviors
+the chapter has observed in testing and should expect to see again
+during the event. Document them here so an admin triaging day-of
+doesn't lose time hunting a cause that doesn't exist.
+
+- **OneSignal dashboard labels iPads as "iPhone".** The Users &
+  Subscriptions and Messages pages read the device class from the
+  Safari user agent, and iPadOS Safari identifies as mobile Safari
+  rather than iPad Safari. An iPad subscription will show "iPhone" in
+  the Device column. To tell two devices apart when they both read as
+  "iPhone", compare the first-session timestamps on each row, or send
+  a push from the admin composer and watch which physical device
+  buzzes. This is purely a labeling issue — delivery is unaffected.
+- **Uninstalling the PWA on iOS does not immediately drop the
+  OneSignal subscription.** When an attendee deletes the home-screen
+  icon on iOS, Apple does not notify OneSignal. The dashboard entry
+  continues to show as **Subscribed** until enough APNs delivery
+  failures accumulate for OneSignal to tombstone it, which can take
+  days. During the event this is not a problem — stale subscriptions
+  just silently absorb the pushes nobody sees. Do not interpret an
+  elevated "Subscribed" count on the OneSignal Messages page as proof
+  the audience is intact after a long gap between events.
+- **iOS first-push warm-up.** Covered above under
+  **Troubleshooting push delivery → iOS first-push warm-up**. Listed
+  here so the "known quirks" section is a single landing spot for
+  anyone orienting on day-of weirdness; the detail stays with the
+  troubleshooting flow where it is operationally actionable.

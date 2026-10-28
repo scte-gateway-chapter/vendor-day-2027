@@ -479,6 +479,15 @@ Alternatively, publish a test announcement from the admin composer with
 "Send push" checked, then delete the announcement from the admin after
 you have verified the push arrived.
 
+If a test device does not receive the push, open the attendee app with
+`?debug=1` appended to the URL on that device. The on-device debug
+overlay surfaces the BUILD_ID the device is running, the OneSignal SDK
+state (whether `optedIn` is `true`, the last six characters of the
+subscription id, and the `Notifications.permission` boolean), and a
+rolling event feed. Tap **Copy debug text** in the overlay to share the
+output with whoever is diagnosing. See `docs/admin-runbook.md` →
+**Debug overlay** for the full field reference.
+
 ---
 
 ## Known limitations
@@ -486,16 +495,32 @@ you have verified the push arrived.
 - **Browser compatibility floor.** The app shell polyfills
   `crypto.randomUUID` (via `public/js/polyfills.js` on the page and an
   inline block at the top of `public/sw.js` for the service worker), so
-  the effective minimum requirement is any browser that exposes
+  the effective minimum requirement is any HTTPS browser that exposes
   `crypto.getRandomValues` — universal in HTTPS contexts since ~2015.
-  Older browsers without that method cannot run the app regardless.
-- **iOS web push reliability.** Delivery on iOS depends heavily on the
-  installed PWA state, screen-on state, and the specific iOS version /
-  device. The chapter has observed some iPhones that stop receiving
-  pushes after a few hours even when nothing in our code changed. There
-  is no fix from our side — the quirks live in iOS's Apple Push
-  Notification Service bridge. Document the expectation to board members:
-  push is best-effort, not guaranteed.
+  Before the polyfill shipped, the undocumented floor was effectively
+  Chrome 92+ / Safari 15.4+ / Firefox 95+ (the browsers that exposed
+  native `crypto.randomUUID`); on anything older, the OneSignal Web SDK
+  v16 init threw before it could register a subscription. Older
+  browsers without `crypto.getRandomValues` still cannot run the app.
+- **Push delivery is verified across iPhone, iPad, and Android Chrome,
+  but APNs remains best-effort on iOS.** During Task 25 field testing
+  the admin composer successfully delivered a test push to all three
+  device classes after the subscribe path moved to
+  `PushSubscription.optIn()` (see `.kiro/specs/vendor-day-app/design.md`
+  → **Push Notification Flow**). iOS Apple Push Notification Service
+  can still drop or delay individual pushes under normal operating
+  conditions — Low Power Mode, backgrounded or suspended app state,
+  Focus / Do Not Disturb, lock-screen state, and poor connectivity are
+  the usual culprits — and none of those are fixable from our side.
+  There is also an observed iOS "first-push warm-up" effect: the very
+  first push after a fresh subscribe on iOS can drop silently at APNs,
+  with every subsequent push delivering reliably. Operational
+  mitigation: ask attendees to install the PWA and tap **Enable
+  notifications** at least a day before the event, and send a benign
+  "Welcome to Vendor Day" push to all subscribers before doors open so
+  every subscription has already warmed up before any real
+  announcements go out. See `docs/admin-runbook.md` → **iOS first-push
+  warm-up** for the attendee-support playbook.
 - **Filtered Firestore views don't persist offline.** The service worker
   caches Firestore `GET` list responses, so Agenda and Sponsors render
   from cache when offline. Views that rely on filtered queries use

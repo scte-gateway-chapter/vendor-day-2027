@@ -178,8 +178,9 @@ instructions. When a check fails, pivot to:
       setup wizard was not completed end-to-end — see
       `docs/deployment.md` → OneSignal. _(Req 2.2, 6.2)_
 
-- [ ] 2. **iOS 16.4+ end-to-end delivery.** On an iPhone running iOS
-      16.4 or later with Safari:
+- [ ] 2. **Verified push delivery to iPhone / iPad from the admin
+      send-push flow.** On an iPhone (iOS 16.4+) and an iPad with
+      Safari:
 
       1. Open `https://2027vendorday.gatewayscte.org/` in Safari.
       2. Install the PWA with Share → Add to Home Screen.
@@ -189,13 +190,16 @@ instructions. When a check fails, pivot to:
       5. From a laptop signed in to `/admin/`, compose and publish a
          test announcement with "Send as push notification" checked.
 
-      The notification arrives on the iPhone within 10 seconds. Tapping
-      it opens the installed app directly on the matching announcement
-      card with the brief highlight. Delete the test announcement
-      afterward. _(Req 2.2, 2.3, 2.6, 6.2, 6.3)_
+      The notification arrives on each iOS device, typically within a
+      few seconds (first-push warm-up may drop the very first delivery
+      on a brand-new subscribe — see the **Push delivery warm-up**
+      section below). Tapping the notification opens the installed app
+      on the matching announcement card with the brief highlight.
+      Delete the test announcement afterward. _(Req 2.2, 2.3, 2.6,
+      6.2, 6.3)_
 
-- [ ] 3. **Android Chrome end-to-end delivery.** On an Android phone
-      with Chrome:
+- [ ] 3. **Verified push delivery to Android Chrome from the admin
+      send-push flow.** On an Android phone with Chrome:
 
       1. Open the production URL.
       2. Open Announcements, tap Enable on the opt-in card, and accept
@@ -203,11 +207,9 @@ instructions. When a check fails, pivot to:
       3. From admin, publish a second test announcement with push
          checked.
 
-      The notification arrives within 10 seconds; tapping it opens the
-      app on the matching announcement. Delete the test announcement
-      afterward. (See `docs/deployment.md` → Known limitations for the
-      iOS web push reliability caveat; Android is more consistent and
-      is the primary reliability signal here.) _(Req 2.2, 6.2, 6.3)_
+      The notification arrives within a few seconds and tapping it
+      opens the app on the matching announcement. Delete the test
+      announcement afterward. _(Req 2.2, 6.2, 6.3)_
 
 - [ ] 4. **Permission denial path.** On a second test device (fresh
       profile or a device that has never visited the production URL),
@@ -223,6 +225,52 @@ instructions. When a check fails, pivot to:
       OneSignal reachable. If either is red, see `docs/deployment.md`
       → Smoke tests before continuing. _(Req 10.4)_
 
+- [ ] 6. **Debug overlay reachable at `?debug=1` from production.**
+      From any device, open
+      `https://2027vendorday.gatewayscte.org/?debug=1`. A small
+      `🐞 DEBUG` tab renders in the bottom corner. Tap it to expand the
+      overlay and confirm the App version, Config endpoint, OneSignal
+      state, and Recent events sections render without errors. This is
+      the primary troubleshooting entry point if an attendee reports
+      push isn't working — see `docs/admin-runbook.md` → **Debug
+      overlay** for the field reference. _(Req 2.4, 10.4)_
+
+### Push delivery warm-up
+
+- [ ] 7. **Each admin has personally subscribed and received at least
+      one real test push from their own device at least 24 hours before
+      the event.** Record the admin name, device, and the admin
+      composer timestamp of the test push below. The 24-hour window
+      exists so every admin subscription gets through its iOS
+      first-push warm-up well before go-live — see
+      `docs/admin-runbook.md` → **iOS first-push warm-up**.
+
+      | Admin | Device / OS | Test push timestamp |
+      | --- | --- | --- |
+      | | | |
+      | | | |
+      | | | |
+
+- [ ] 8. **At venue setup on event morning, send a benign
+      "Welcome to Vendor Day" push to all subscribers before doors
+      open.** This is NOT a dry-run — it is a real push to real
+      attendees that doubles as a warm-up for every iOS subscription
+      on the roster. Target 30-60 minutes before door-open so any
+      first-push drops on iOS have already happened by the time the
+      first real announcement goes out. See `docs/admin-runbook.md`
+      → **iOS first-push warm-up** for the recommended body text.
+      _(Req 6.2, 6.3)_
+
+- [ ] 9. **If an attendee reports push isn't working, direct them to
+      `?debug=1`.** The on-site admin asks the attendee to open the
+      installed app's URL with `?debug=1` appended, tap the
+      `🐞 DEBUG` tab, and then tap **Copy debug text** in the
+      overlay. The attendee shares the pasted output with the on-site
+      admin (text message, email, or screen share). The debug text
+      contains no secrets and no PII — it is safe to send over any
+      channel. See `docs/admin-runbook.md` → **Debug overlay** and
+      → **iOS first-push warm-up** for triage. _(Req 2.4, 2.5)_
+
 ### Section 2 sign-off
 
 | Item | Status | Who ran it | Date | Device / OS version | Notes |
@@ -232,6 +280,10 @@ instructions. When a check fails, pivot to:
 | 3 | | | | | |
 | 4 | | | | | |
 | 5 | | | | | — |
+| 6 | | | | | |
+| 7 | | | | | See admin table above |
+| 8 | | | | | admin composer timestamp = |
+| 9 | | | | | — |
 
 ---
 
