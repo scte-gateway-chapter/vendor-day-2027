@@ -574,7 +574,7 @@ async function main() {
   router.start();
 
   // Mount the on-device debug overlay last so it floats above every
-  // other surface. Gated on `?debug=1` (or a sticky sessionStorage flag
+  // other surface. Gated on `?debug=1` (or a sticky localStorage flag
   // from a prior visit); a no-op otherwise.
   if (isDebugEnabled()) {
     mountDebugOverlay();

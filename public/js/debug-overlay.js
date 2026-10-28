@@ -16,12 +16,13 @@ import {
   subscribeToDebugLog,
   isDebugEnabled,
   setDebugEnabled,
+  getDebugActivationSource,
   pushDebugLog,
 } from "./debug-log.js";
 import { getConfig } from "./firebase.js";
 import { getAppSettings, isSignInEnabled, getAppSettingsCachedAt } from "./app-settings.js";
 
-const SESSION_KEY = "vendorday2027.debug";
+const STORAGE_KEY = "vendorday2027.debug";
 const POLL_MS = 1000;
 const MAX_EVENTS_SHOWN = 20;
 const BUILD_ID_PATTERN = /const\s+BUILD_ID\s*=\s*"([^"]*)"/;
@@ -37,6 +38,17 @@ export function mountDebugOverlay() {
   if (mounted) return;
   if (!isDebugEnabled()) return;
   mounted = true;
+
+  // One-liner at the top of the feed so a field tester can tell at a
+  // glance whether the overlay is here because of this page's URL or
+  // because of a persisted flag (which is how the overlay reaches the
+  // installed PWA on iOS — see debug-log.js for the storage story).
+  const source = getDebugActivationSource();
+  if (source === "localStorage") {
+    pushDebugLog("overlay", "restored from localStorage");
+  } else if (source === "url") {
+    pushDebugLog("overlay", "activated via URL param");
+  }
 
   const root = buildOverlayDom();
   document.body.appendChild(root);
@@ -113,10 +125,11 @@ export function mountDebugOverlay() {
   });
 
   dismissBtn.addEventListener("click", () => {
-    // Flip the session flag off (the brief: dismiss button writes
+    // Flip the stored flag off (the brief: dismiss button writes
     // `debug: 'off'`), tear down the overlay DOM, and stop polling.
+    // `setDebugEnabled` writes to localStorage, so the next page load
+    // (including from the installed PWA) stays dismissed.
     setDebugEnabled(false);
-    try { sessionStorage.setItem(SESSION_KEY, "off"); } catch (_err) { /* storage blocked */ }
     stopPolling();
     root.remove();
     mounted = false;
@@ -376,9 +389,9 @@ function collectAppVersion(swBuildId) {
   rows.push(["SW ready", readyState]);
   let flag = "off";
   try {
-    flag = sessionStorage.getItem(SESSION_KEY) || "off";
+    flag = localStorage.getItem(STORAGE_KEY) || "off";
   } catch (_err) { /* storage blocked */ }
-  rows.push(["sessionStorage debug", flag]);
+  rows.push(["localStorage debug", flag]);
   return rows;
 }
 

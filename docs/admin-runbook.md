@@ -691,20 +691,19 @@ turned on for the duration of a troubleshooting session.
 
 **How to turn it on:**
 
-1. On the test device, append `?debug=1` to the attendee app URL. From
-   the installed PWA home-screen icon, the easiest path is to open the
-   app's URL in Chrome / Safari with the query string, then switch back
-   to the installed PWA — the overlay persists for the browser tab's
-   session via `sessionStorage`.
+1. On the test device, append `?debug=1` to the attendee app URL.
+   Once activated via `?debug=1` in Safari (or any browser tab), the
+   overlay will persist in the installed PWA because the flag is stored
+   in localStorage.
 2. A small `🐞 DEBUG` tab appears in the bottom-right (bottom-center on
    narrow phone screens). Tap it to expand the panel.
-3. To turn it off, tap the `×` dismiss button in the panel's header, or
-   append `?debug=0` to the URL.
+3. To turn it off, tap the dismiss (×) button in the overlay, or append
+   `?debug=0` to the URL in any tab.
 
 **What each section shows:**
 
 - **App version** — the service worker's `BUILD_ID`, the service
-  worker's controller URL, its scope, and whether the sessionStorage
+  worker's controller URL, its scope, and whether the localStorage
   flag is sticky. If `BUILD_ID` differs from the latest Cloudflare
   build id, the device is on a stale shell; use the **Unregister SW**
   action below.
