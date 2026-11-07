@@ -74,6 +74,28 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // BSC pre-registration roster. The attendee client reads one
+    // document at a time keyed by lowercased email to detect whether
+    // the signer is a Broadband Skills Challenge competitor. Enumeration
+    // (list) is denied so the roster — including supervisor contact
+    // info — cannot be scraped by anyone holding the public web API
+    // key. Writes go through `/api/bsc-roster-upload` with the service
+    // account, bypassing rules (design section → Firestore collections).
+    match /bscPreReg/{email} {
+      allow get: if true;
+      allow list: if false;
+      allow write: if false;
+    }
+
+    // BSC check-in log. Attendee clients create one document per
+    // completed check-in; nobody reads, updates, or deletes directly.
+    // The admin dashboard reads server-side via `/api/firestore-read`
+    // using the Admin SDK.
+    match /bscCheckins/{checkinId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+
     // Default-deny everything else.
     match /{document=**} {
       allow read, write: if false;

@@ -24,6 +24,7 @@ const ALLOWED_COLLECTIONS = new Set([
   "feedbackConfig",
   "recap",
   "appSettings",
+  "bscCheckins",
 ]);
 const DOC_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 const DEFAULT_LIMIT = 500;

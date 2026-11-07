@@ -3400,3 +3400,340 @@ body.admin-modal-open {
 .admin-settings-toggle-skeleton {
   min-height: 96px;
 }
+
+/* ---------- Broadband Skills Challenge (admin Settings + dashboard) ---------- */
+
+/* Settings-page section. Shares the vertical gap pattern of the Sign-In
+   section above it, plus a thin brand-palette divider that visually
+   separates the BSC concerns from Sign-In without introducing a hard
+   rule between unrelated settings surfaces. */
+.admin-bsc-settings-section {
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--border-neutral);
+}
+
+.admin-bsc-waiver-mode {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.admin-bsc-waiver-mode legend {
+  padding: 0 var(--space-xs);
+  font-weight: 600;
+  color: var(--body-text);
+}
+.admin-bsc-waiver-mode__option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  cursor: pointer;
+  color: var(--body-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+.admin-bsc-waiver-mode__option input[type="radio"] {
+  margin-top: 0.25rem;
+}
+.admin-bsc-waiver-mode__banner {
+  margin-top: var(--space-xs);
+}
+
+.admin-bsc-waiver-text-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.admin-bsc-waiver-text-field__label {
+  font-weight: 600;
+  color: var(--body-text);
+}
+.admin-bsc-waiver-text-field__textarea {
+  width: 100%;
+  min-height: 10rem;
+  padding: var(--space-sm);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+  resize: vertical;
+}
+.admin-bsc-waiver-text-field__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.admin-bsc-waiver-text-field__warning {
+  /* .status-error supplies the warning-palette; this just controls spacing. */
+  margin: 0 0 var(--space-xs);
+}
+.admin-bsc-waiver-text-field__banner {
+  /* .status-error supplies the warning-palette; this just controls spacing. */
+  margin: 0;
+}
+
+.admin-bsc-upload-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.admin-bsc-upload-card__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--body-text);
+}
+.admin-bsc-upload-card__helper {
+  margin: 0 0 var(--space-xs);
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+.admin-bsc-upload-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.admin-bsc-upload-card__spinner {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-top-color: var(--brand-green);
+  border-radius: 50%;
+  animation: admin-bsc-spin 0.8s linear infinite;
+}
+@keyframes admin-bsc-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .admin-bsc-upload-card__spinner { animation: none; }
+}
+.admin-bsc-upload-card__result {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--body-text);
+}
+.admin-bsc-upload-card__errors {
+  max-height: 12rem;
+  overflow-y: auto;
+  padding: var(--space-sm);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  font-size: var(--font-size-sm);
+}
+.admin-bsc-upload-card__error-list {
+  margin: var(--space-xs) 0 0;
+  padding-left: 1.25rem;
+  color: var(--body-text);
+}
+.admin-bsc-upload-card__banner {
+  margin: 0;
+}
+
+.admin-bsc-settings-section__status {
+  margin: 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+
+/* ---------- BSC Check-Ins dashboard ---------- */
+
+.admin-bsc-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.admin-bsc-dashboard__header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: var(--space-sm) 0;
+  background: var(--background);
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-bsc-dashboard__header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.admin-bsc-dashboard__header-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  color: var(--brand-green-text);
+  line-height: var(--line-height-lg);
+}
+
+.admin-bsc-dashboard__summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  color: var(--body-text);
+}
+.admin-bsc-dashboard__summary-line {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--body-text);
+}
+.admin-bsc-dashboard__summary-refreshed {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--secondary-text);
+}
+
+.admin-bsc-dashboard__error {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  align-items: center;
+}
+.admin-bsc-dashboard__error-retry {
+  flex: 0 0 auto;
+}
+
+.admin-bsc-dashboard__controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: flex-end;
+}
+.admin-bsc-dashboard__segmented {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.admin-bsc-dashboard__segmented-label {
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+}
+.admin-bsc-dashboard__segmented-buttons {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface-alt);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+.admin-bsc-dashboard__segmented-btn {
+  min-height: 32px;
+  padding: 0 var(--space-sm);
+  background: transparent;
+  color: var(--body-text);
+  font-size: var(--font-size-sm);
+  border: 0;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+}
+.admin-bsc-dashboard__segmented-btn[aria-pressed="true"] {
+  background: var(--brand-green);
+  color: #FFF;
+}
+
+.admin-bsc-dashboard__search {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  flex: 1 1 12rem;
+}
+.admin-bsc-dashboard__search-input {
+  min-height: 36px;
+  width: 100%;
+}
+.admin-bsc-dashboard__clear {
+  flex: 0 0 auto;
+}
+
+.admin-bsc-dashboard__table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+}
+.admin-bsc-dashboard__table {
+  width: 100%;
+  min-width: 60rem;
+  border-collapse: collapse;
+  background: var(--surface);
+}
+.admin-bsc-dashboard__table th,
+.admin-bsc-dashboard__table td {
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border-neutral);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-md);
+}
+.admin-bsc-dashboard__table th {
+  background: var(--surface-alt);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.admin-bsc-dashboard__table tbody tr:last-child td {
+  border-bottom: 0;
+}
+.admin-bsc-dashboard__sort-btn {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+.admin-bsc-row--warning {
+  background: var(--warning-bg);
+}
+.admin-bsc-row--warning td:first-child::before {
+  content: "\26A0";
+  margin-right: var(--space-xs);
+  color: var(--warning-text);
+}
+
+.admin-bsc-chip {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-sm);
+  background: var(--surface-alt);
+  color: var(--secondary-text);
+  border: 1px solid var(--border-neutral);
+}
+.admin-bsc-chip--pre-registered,
+.admin-bsc-chip--yes {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+.admin-bsc-chip--walk-up,
+.admin-bsc-chip--paper {
+  background: var(--surface-alt);
+  color: var(--secondary-text);
+  border-color: var(--border-neutral);
+}
+.admin-bsc-chip--no {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+}
+.admin-bsc-chip--electronic {
+  background: var(--success-bg);
+  color: var(--brand-green-text);
+  border-color: var(--success-border);
+}

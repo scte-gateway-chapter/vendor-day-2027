@@ -83,6 +83,19 @@ async function main() {
     // false so a fresh seed hides sign-in until an admin flips the
     // toggle on from the admin Settings page close to event start.
     signInEnabled: false,
+    // Broadband Skills Challenge check-in surfaces (sign-in checkbox,
+    // #/bsc route, pre-reg prompt, admin dashboard) gate on bscEnabled.
+    // Default false, same fail-closed posture as signInEnabled. Waiver
+    // mode defaults to "paper" so a brand-new deploy without legal
+    // review falls back to the on-table paper waiver reminder; waiver
+    // text starts empty and the Settings UI nags the admin to fill it
+    // in before flipping mode to "electronic". Roster bookkeeping
+    // fields are maintained by /api/bsc-roster-upload.
+    bscEnabled: false,
+    bscWaiverMode: "paper",
+    bscWaiverText: "",
+    bscRosterCount: 0,
+    bscRosterLastImportedAt: null,
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: "seed-script",
   };

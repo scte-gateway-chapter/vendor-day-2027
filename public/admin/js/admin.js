@@ -25,6 +25,7 @@ import renderAttendeesImporter from "./attendees-importer.js";
 import renderFeedbackEditor from "./feedback-editor.js";
 import renderRecapEditor from "./recap-editor.js";
 import renderSettingsEditor from "./settings-editor.js";
+import renderBscCheckinsEditor from "./bsc-checkins.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
@@ -44,6 +45,7 @@ const PROTECTED_ROUTES = [
   { slug: "feedback", label: "Admin Feedback", taskLabel: "Task 23" }, // replaced by renderFeedbackEditor below
   { slug: "recap", label: "Admin Recap", taskLabel: "Task 24" }, // replaced by renderRecapEditor below
   { slug: "settings", label: "Admin Settings", taskLabel: "Attendee Sign-In toggle" }, // replaced by renderSettingsEditor below
+  { slug: "bsc-checkins", label: "Admin BSC Check-Ins", taskLabel: "BSC check-in" }, // replaced by renderBscCheckinsEditor below
 ];
 
 /* ----------------- Per-view cleanup registry ----------------- */
@@ -289,6 +291,23 @@ function handleSettingsRoute() {
   syncPhoneDropdown("settings");
 }
 
+function handleBscCheckinsRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderBscCheckinsEditor(host)
+      .catch((err) => {
+        console.warn("[admin] bsc check-ins render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
+  }
+  syncPhoneDropdown("bsc-checkins");
+}
+
 function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
@@ -321,6 +340,7 @@ function registerRoutes() {
   router.register("#/feedback", handleFeedbackRoute);
   router.register("#/recap", handleRecapRoute);
   router.register("#/settings", handleSettingsRoute);
+  router.register("#/bsc-checkins", handleBscCheckinsRoute);
   for (const route of PROTECTED_ROUTES) {
     if (
       route.slug === "dashboard" ||
@@ -331,7 +351,8 @@ function registerRoutes() {
       route.slug === "attendees" ||
       route.slug === "feedback" ||
       route.slug === "recap" ||
-      route.slug === "settings"
+      route.slug === "settings" ||
+      route.slug === "bsc-checkins"
     ) continue;
     router.register(`#/${route.slug}`, () =>
       handleProtectedRoute(route.slug, route.label, route.taskLabel),

@@ -20,7 +20,7 @@ import {
   pushDebugLog,
 } from "./debug-log.js";
 import { getConfig } from "./firebase.js";
-import { getAppSettings, isSignInEnabled, getAppSettingsCachedAt } from "./app-settings.js";
+import { getAppSettings, isSignInEnabled, isBscEnabled, getAppSettingsCachedAt } from "./app-settings.js";
 
 const STORAGE_KEY = "vendorday2027.debug";
 const POLL_MS = 1000;
@@ -470,6 +470,11 @@ function collectAppSettings() {
     signInFlag = String(isSignInEnabled());
   } catch (_err) { /* ignore */ }
   rows.push(["signInEnabled", signInFlag]);
+  let bscFlag = "unknown";
+  try {
+    bscFlag = String(isBscEnabled());
+  } catch (_err) { /* ignore */ }
+  rows.push(["bscEnabled", bscFlag]);
   rows.push(["cache state", settings ? "loaded" : "empty"]);
   let cachedAt = null;
   try {

@@ -87,6 +87,56 @@ export function isSignInEnabled() {
 }
 
 /**
+ * Whether the admin has turned on the Broadband Skills Challenge
+ * check-in surfaces (sign-in checkbox, `#/bsc` route, pre-reg prompt,
+ * admin dashboard). Returns `false` whenever the cache is empty or the
+ * field is missing / falsy — fail-closed, same posture as
+ * `isSignInEnabled`.
+ * @returns {boolean}
+ */
+export function isBscEnabled() {
+  return cached?.bscEnabled === true;
+}
+
+/**
+ * The admin's intended BSC waiver mode. Returns `"electronic"` only when
+ * the stored field is literally `"electronic"`; anything else — missing,
+ * malformed, legacy, `"paper"` — reads as `"paper"`. This is the
+ * "intended" mode exposed in the admin Settings UI; the attendee flow
+ * calls `getEffectiveBscWaiverMode()` instead so it folds in the
+ * fallback-to-paper-when-text-empty rule.
+ * @returns {"paper" | "electronic"}
+ */
+export function getBscWaiverMode() {
+  return cached?.bscWaiverMode === "electronic" ? "electronic" : "paper";
+}
+
+/**
+ * The admin-authored BSC waiver text. Returns `""` whenever the cache is
+ * empty or the field is not a string. Callers do their own `.trim()` if
+ * they need to detect whitespace-only content.
+ * @returns {string}
+ */
+export function getBscWaiverText() {
+  const v = cached?.bscWaiverText;
+  return typeof v === "string" ? v : "";
+}
+
+/**
+ * The waiver mode the attendee flow should actually render. Returns
+ * `"electronic"` only when the admin intended electronic AND the stored
+ * waiver text is non-empty after trim; otherwise returns `"paper"`.
+ * This lets the admin Settings UI nag about "electronic selected but no
+ * text" without the attendee app crashing — the attendee flow silently
+ * falls back to the paper reminder in that broken state.
+ * @returns {"paper" | "electronic"}
+ */
+export function getEffectiveBscWaiverMode() {
+  if (getBscWaiverMode() !== "electronic") return "paper";
+  return getBscWaiverText().trim() ? "electronic" : "paper";
+}
+
+/**
  * Epoch-ms of the last `loadAppSettings()` resolution (success OR failure),
  * or `null` if the load hasn't finished yet. Used only by the debug
  * overlay's "cache age" row; production code should keep using

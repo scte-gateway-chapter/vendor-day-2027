@@ -17,6 +17,14 @@
 //                           ZAPIER_SIGNIN_WEBHOOK_URL env var is not set, in
 //                           which case the sign-in view renders a graceful
 //                           "not yet configured" state.
+//   - bscWebhookUrl       : Zapier Catch Hook URL used by the in-app
+//                           Broadband Skills Challenge (BSC) check-in flow.
+//                           The Zap writes each check-in to the shared BSC
+//                           Google Sheet. Null when the
+//                           ZAPIER_BSC_WEBHOOK_URL env var is not set, in
+//                           which case the attendee BSC view renders a
+//                           graceful "not yet configured" state (same
+//                           posture as the sign-in webhook).
 //
 // Secret keys (service-account JSON, OneSignal REST key, admin JWT secret,
 // admin passphrase hash) are NEVER returned here — they stay server-side.
@@ -83,6 +91,7 @@ export async function onRequest(context) {
 
   const assetsBaseUrl = env.R2_PUBLIC_URL || null;
   const signInWebhookUrl = env.ZAPIER_SIGNIN_WEBHOOK_URL || null;
+  const bscWebhookUrl = env.ZAPIER_BSC_WEBHOOK_URL || null;
 
   return jsonResponse(
     {
@@ -91,6 +100,7 @@ export async function onRequest(context) {
       oneSignalAppId,
       assetsBaseUrl,
       signInWebhookUrl,
+      bscWebhookUrl,
     },
     200,
     cors,
