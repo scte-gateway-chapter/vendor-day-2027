@@ -381,8 +381,60 @@ Note: no email, phone, or SCTE member number is stored client-readable in Firest
   venueAddress: string (default "Chesterfield, MO 63005")
   venueMapUrl:  string | null (Cloudflare R2 public URL for the uploaded map â€” key `venue-map/<timestamp>.<ext>`)
   venueMapCaption: string
+  bscEnabled:              boolean (default false â€” fail-closed; see section 17)
+  bscWaiverMode:           "paper" | "electronic" (default "paper")
+  bscWaiverText:           string (default "", admin-authored waiver copy)
+  bscRosterCount:          integer (default 0, maintained by /api/bsc-roster-upload)
+  bscRosterLastImportedAt: string | null (ISO 8601, set after each roster upload)
   updatedAt:    string
   updatedBy:    string
+}
+```
+
+### `bscPreReg/{emailLowered}` â€” Broadband Skills Challenge pre-registration roster
+
+Document id is the attendee's email, lowercased and trimmed. Rows are upserted by the admin via `/api/bsc-roster-upload` from a CSV export of the chapter's Broadband Skills Challenge Registration 2026 Zap-managed Google Sheet. Fields are read client-side on `#/bsc` via Firestore REST (public web API key, rule-gated `get`); the attendee view uses a single-doc GET keyed by the signed-in attendee's lowercased email and the roster collection is NOT list-able from the attendee client (`list: false`).
+
+```
+{
+  attendee_name:    string   // CSV: Competitor name
+  email:            string   // CSV: Email address (lowercased, trimmed â€” matches doc id)
+  company:          string
+  office_location:  string
+  job_role:         string
+  supervisor_name:  string
+  supervisor_email: string
+  supervisor_phone: string
+  scte_member_id:   string   // optional, "" when absent
+  reference_id:     string   // reused for pre-reg check-ins; walk-ups generate fresh ids
+  submitted_at:     string   // original 2026 Zap row timestamp (free-form string)
+  importedAt:       string   // ISO 8601, stamped on each upsert by the roster-upload Function
+}
+```
+
+### `bscCheckins/{uuid}` â€” Broadband Skills Challenge day-of check-ins
+
+Document id is a client-generated v4 UUID. Rows are created directly from the attendee browser via Firestore REST on waiver-step submit (rule-gated `create: true, read|update|delete: false` â€” same posture as `feedbackResponses`). Admin reads go through `/api/firestore-read?collection=bscCheckins` via the admin broker.
+
+```
+{
+  attendee_name:     string
+  email:             string            // lowercased, trimmed
+  company:           string
+  office_location:   string
+  job_role:          string
+  supervisor_name:   string
+  supervisor_email:  string             // lowercased, trimmed
+  supervisor_phone:  string
+  scte_member_id:    string             // "" when absent
+  reference_id:      string             // from roster for pre-reg, BSC-YYYYMMDD-HHMMSS for walk-ups
+  submitted_at:      string             // ISO 8601 at waiver submit (also sent to the BSC Zap)
+  entry_type:        "pre-registered" | "walk-up"
+  manager_approved:  "yes" | "no" | ""  // "" for pre-reg; "yes"/"no" for walk-up (14.5)
+  waiver_mode:       "paper" | "electronic"
+  waiver_signature:  string             // "" for paper
+  waiver_signed_at:  string             // ISO 8601 for electronic, "" for paper
+  createdAt:         string             // ISO 8601 captured at write-time; admin dashboard sort key
 }
 ```
 
@@ -672,3 +724,51 @@ A `signInEnabled` boolean on `appSettings/singleton` gates every attendee-facing
 **Propagation.** The attendee app reads `appSettings/singleton` once at bootstrap into `public/js/app-settings.js` and caches the result for the session. No Firestore snapshot listener runs for this flag â€” the design pattern for appSettings is already "next refresh" (the hero text, venue block, and map caption follow the same cadence), and a snapshot listener would double the Firestore read budget for a toggle that the board flips a handful of times per event. An admin flip lands on an attendee device the next time the app is refreshed or relaunched.
 
 **GoDaddy page is independent.** The toggle only governs in-app surfaces. The public GoDaddy sign-in page has its own availability controls on the chapter's site; the two intake paths share the same Zapier Catch Hook but their visibility is managed separately. Hiding the in-app surface during setup lets the board run back-of-house tests through the GoDaddy page without confusing in-app attendees who happen to open the app early.
+
+
+## 17. Broadband Skills Challenge Check-In (post-launch)
+
+The Broadband Skills Challenge (BSC, formerly the Cable Games) is a competition the chapter has run alongside the vendor show for many years. Technicians' managers pre-register them through a chapter-maintained Zap-fed Google Sheet (Broadband Skills Challenge Registration 2026 Zap), and historically the day-of check-in — along with a liability waiver — was done on paper at the competition table. For 2027 the board wanted the day-of check-in moved into the installed PWA so it fits inside the same sign-in queue the main attendee flow addresses, and so the ad-hoc paper waiver pile could be either replaced with an electronic signature flow or at minimum tracked alongside the rest of the arrival data.
+
+**Architecture.** One route in the attendee app (`#/bsc`) with a three-step internal state machine (intake ? waiver ? confirmation); one admin dashboard (`#/bsc-checkins`); one new Pages Function (`/api/bsc-roster-upload`) for CSV upserts; two new Firestore collections (`bscPreReg` and `bscCheckins` — see section 5); five new fields on `appSettings/singleton` (`bscEnabled`, `bscWaiverMode`, `bscWaiverText`, `bscRosterCount`, `bscRosterLastImportedAt`); and one new Cloudflare env var (`ZAPIER_BSC_WEBHOOK_URL`) surfaced to the client as `bscWebhookUrl` on `/api/config`. No new npm dependencies.
+
+```
+Attendee browser
++-- /api/config  ? bscWebhookUrl              (new field; null when env var is unset)
++-- Firestore REST (public key)
+¦    +-- GET  bscPreReg/{emailLowered}        (rule: allow get: true, list: false)
+¦    +-- POST bscCheckins (uuid docId)        (rule: allow create: true, read/update/delete: false)
++-- Zapier Catch Hook POST (BSC)              (shared BSC Google Sheet)
+
+Admin browser
++-- /api/firestore-read?collection=bscCheckins (ALLOWED_COLLECTIONS adds "bscCheckins")
++-- /api/firestore-write  op=update appSettings {bscEnabled|bscWaiverMode|bscWaiverText}
++-- /api/bsc-roster-upload                    (new multipart Function; JWT auth; service account writes)
+```
+
+**Pre-reg roster lookup pattern (public-get, no-list).** The attendee client reads `bscPreReg/{emailLowered}` directly from the Firestore REST endpoint using the shared public web API key — `firestore.rules` is the only gate. The rule allows `get` on individual docs and denies `list` outright, so an attendee can look up their own row by their own email but cannot enumerate the roster. The web API key is public (ships with every attendee); the rule shape makes the trade-off explicit — anyone who knows a competitor's email AND has the key can read that competitor's roster row (including their manager's contact info), which matches the sensitivity bar of the roster Sheet itself. The alternative — standing up a Pages Function behind an anonymous-auth / App Check lookup — is more scope than the risk justifies for a one-day event. The posture is called out in `docs/admin-runbook.md` so a future admin who wants to add attendee-visible fields knows what public-get means.
+
+**No pre-encoding on the lookup key.** The Firestore REST client's `docUrl` helper (`public/js/firebase.js`) already segment-encodes every path segment. The orchestrator and the pre-reg prompt both pass the RAW lowercased + trimmed email to `getDoc(\`bscPreReg/${key}\`)`. Pre-encoding the key in the caller would double-encode `@` to `%2540` on the wire and silently return `null` for every real email — violating Requirement 14.3.4 by promoting every pre-registered attendee to walk-up intake. The requirement is encoded in a design-review carry-over (HIGH finding 1) so the invariant survives future refactors.
+
+**State machine summary.** On entry to `#/bsc` the orchestrator primes the shared appSettings cache, verifies `isBscEnabled()`, verifies `bscWebhookUrl` is non-empty, and verifies a device-local sign-in exists with an email. Any check failing routes to the appropriate placeholder (`disabled`, `not configured`) or bounces to `#/sign-in` with the two-flag handshake (`vendorday2027.bsc.returnAfterSignIn` + `vendorday2027.bsc.preCheckOnSignIn`). The one-shot roster lookup then branches to `renderPreRegConfirm` (pre-fill every roster field, no manager-approval prompt) or `renderWalkUp` (sign-in-seeded fields, blank BSC-only fields, manager-approval radios with no default and no "No" rejection). Both intake submits normalize `email` and `supervisor_email` with `.trim().toLowerCase()` before leaving the step so persistence is canonical from that moment onward. The waiver step reads `getEffectiveBscWaiverMode()` which folds in the fallback-to-paper rule (electronic + empty text ? paper), and the finalize path runs `Promise.allSettled` across the Zap POST and the Firestore `bscCheckins` create — both legs rejected throws `BscFinalizeError` which the waiver view catches and surfaces as a Retry banner that preserves the typed signature; a single-leg rejection advances to the confirmation screen with the `.bsc-leg-failure-banner` indicating which leg failed so a BSC coordinator can reconcile. On the pre-reg path `reference_id` is reused verbatim from the roster; walk-ups generate `BSC-YYYYMMDD-HHMMSS` with second resolution and no suffix — matching the 2026 Zap's on-the-wire format exactly, with the pre-launch checklist Section 6b item 12 duplicate scan as the primary mitigation for same-second collisions among walk-ups.
+
+**Admin gating via `bscEnabled`.** Mirrors section 16's `signInEnabled` pattern. One accessor (`isBscEnabled()` in `public/js/app-settings.js`) returns `false` whenever the cached settings doc is empty or the field is non-`true` — fail-closed. The accessor gates (a) the BSC checkbox on the sign-in form, (b) the pre-reg prompt after a successful sign-in, (c) the `#/bsc` route (which renders a "BSC check-in isn't available yet" placeholder when the toggle is off), (d) the admin dashboard content at `#/bsc-checkins` (which renders a "BSC is currently disabled" shell with a link back to Settings when off). The dashboard route itself stays reachable so admins can confirm state and flip the toggle without leaving the view. Propagation is "next refresh" — no snapshot listener for this field, same cadence as `signInEnabled` — so an admin flip lands on an attendee device the next time the app is refreshed or relaunched. A flip mid-attendee-flow does NOT abort the in-progress submission; the design calls this out so no later patch "fixes" it into a user-hostile mid-flow halt.
+
+**Shared-sheet pattern via Zapier.** On waiver submit the client POSTs `application/x-www-form-urlencoded` to the BSC Zap (URL from `/api/config.bscWebhookUrl`) AND creates a `bscCheckins/{uuid}` document directly via Firestore REST. Both legs are the system of record for different consumers: the shared BSC Google Sheet (Zap-fed) is the BSC coordinator's workflow surface and the long-term archive; the Firestore `bscCheckins` collection powers the admin dashboard at `#/bsc-checkins`. The two legs are intentionally NOT redundant backups — the partial-success banner tells the attendee "we recorded your check-in but could not sync with the registration sheet, please notify a BSC coordinator" when the Zap leg fails and vice versa. Both legs failing throws `BscFinalizeError` and the attendee sees Retry; a single leg failing advances to the confirmation screen so the attendee is not blocked.
+
+**`appSettings/singleton` field additions.** Five new fields seeded in `scripts/seed-app-settings.js`:
+- `bscEnabled: false` (seed default — fail-closed; admin flips on from Settings)
+- `bscWaiverMode: "paper"` (seed default — reminder-only waiver step)
+- `bscWaiverText: ""` (seed default — admin pastes legal-reviewed copy; empty forces attendee-side fallback to paper even when mode is "electronic")
+- `bscRosterCount: 0` (maintained by `/api/bsc-roster-upload` after each successful import via a page-sum of `bscPreReg` — the design intentionally avoids `:runAggregationQuery` through the shared `firestoreRequest` helper because the URL shape would 400)
+- `bscRosterLastImportedAt: null` (ISO 8601 after first import)
+
+All five are written through `/api/firestore-write` with `op: "update"` so the existing event metadata and venue map fields are preserved. The upload Function writes `bscRosterCount` and `bscRosterLastImportedAt` directly via `firestoreRequest` with the service account, bypassing the write broker.
+
+**`ZAPIER_BSC_WEBHOOK_URL` env var and `bscWebhookUrl` on `/api/config`.** The webhook URL is NOT hardcoded in the client. `functions/api/config.js` returns `bscWebhookUrl: env.ZAPIER_BSC_WEBHOOK_URL || null`. When the env var is unset the client sees `null` and renders a "BSC check-in is not yet configured" placeholder on `#/bsc` instead of throwing — matches the degrade-gracefully pattern used by other config-driven features. Rotating the URL is a Cloudflare env-var edit plus a redeploy.
+
+**Admin dashboard.** `#/bsc-checkins` renders a sticky header, offline banner, summary strip, filter + search bar, and a scrollable table with 10 columns in design order (Name, Email, Company, Office location, Pre-reg status, Manager approval, Waiver mode, Waiver signed, Signature name, Check-in time). Default sort is `createdAt` DESC with `reference_id` ASC as the stable tie-breaker. Walk-up rows with `manager_approved: "no"` get the warning-palette `.admin-bsc-row--warning` treatment plus a leading icon so BSC coordinators can scan a busy list quickly. The 30-second poll gated on `document.visibilityState === "visible"` matches the Feedback results view's cadence; on poll failure the last-rendered rows and scroll state are preserved and an inline retry banner surfaces above the table. The read ceiling is 1000 rows (`adminReadCollection("bscCheckins", { limit: 1000 })`); 2027 is budgeted at 200, so the ceiling is documentary — the admin runbook calls it out explicitly for future multi-day deployments.
+
+**Admin Settings additions.** A new "Broadband Skills Challenge" section below the existing Sign-In section hosts: the `bscEnabled` toggle (reusing the shared `buildAppSettingsToggle` helper refactored from `signInEnabled`'s plumbing), a `bscWaiverMode` radio pair (Paper / Electronic — two radios rather than a two-state switch because the two modes have materially different legal implications), a `bscWaiverText` textarea with an explicit Save button and a reactive warning banner when the mode is electronic but the text is empty-after-trim, an "Upload BSC roster (CSV)" button that POSTs to `/api/bsc-roster-upload` via `adminFetch` (no manual `Content-Type` header — the browser must set the multipart boundary), and a roster status line driven from `bscRosterCount` and `relativeTime(bscRosterLastImportedAt)`.
+
+**Known ceilings.** The design accepts three documented limits: (1) the 1000-row dashboard truncation at `adminReadCollection` limit (budgeted 200 for 2027 — documentary for v1); (2) same-second reference-id collisions among walk-ups at second resolution, resolved by the Section 6b item 12 duplicate scan on the shared BSC Sheet (Firestore `bscCheckins` is UUID-keyed and unaffected); (3) client-generated `createdAt` ISO strings may collide at millisecond resolution under near-simultaneous submits, resolved by the secondary `reference_id` ASC sort key so the dashboard presentation is deterministic across browsers whose `Array.prototype.sort` is not spec-stable.

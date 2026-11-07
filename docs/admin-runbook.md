@@ -665,6 +665,199 @@ in-app surface stays hidden.
 
 ---
 
+## Broadband Skills Challenge check-in
+
+The in-app Broadband Skills Challenge (BSC) check-in flow is the day-of
+replacement for the paper BSC sign-in queue the chapter has run for
+years. Competitors who were pre-registered through the chapter's
+Broadband Skills Challenge Registration Zap arrive, open the installed
+PWA, sign in on the main attendee form (checking the "I'm competing"
+box, or getting the pre-reg prompt if they forgot), confirm their
+roster details, sign the waiver (paper reminder or electronic — admin
+toggled), and get a confirmation card with their reference id. Walk-up
+competitors fall through to a fuller intake form with a required
+manager-approval attestation.
+
+### Operating the feature
+
+The feature is gated by a `bscEnabled` toggle on the admin Settings
+page. The toggle lives below the Sign-In section and reuses the same
+ARIA switch chrome. **Default is OFF.** Flip it ON on event morning
+once the Zap is confirmed firing, the roster is uploaded, and the
+waiver copy is reviewed. The flip propagates to attendee devices on
+their next page refresh — no live listener runs for this field, same
+cadence as the Sign-In toggle.
+
+When OFF: the sign-in form hides the BSC competitor checkbox, the
+pre-reg prompt is suppressed, `#/bsc` renders a "BSC check-in isn't
+available yet" placeholder with a Back-to-Home control, and the admin
+dashboard at `#/bsc-checkins` renders a "BSC is currently disabled"
+shell. The dashboard route itself remains reachable so you can
+confirm state and flip the toggle without leaving the view.
+
+When ON: the sign-in form shows the BSC checkbox, the pre-reg prompt
+fires once per signed-in session for pre-registered attendees who
+forgot the checkbox, `#/bsc` runs the full intake / waiver /
+confirmation flow, and the dashboard polls `bscCheckins` every 30
+seconds (gated on tab visibility) to render arriving competitors.
+
+### Uploading the roster
+
+Export the Broadband Skills Challenge Registration Google Sheet as
+CSV. Expected columns (case-insensitive, whitespace-tolerant):
+Competitor name, Email address, Company, Office location, Job role /
+title, Supervisor / Manager name, Supervisor / Manager email,
+Supervisor / Manager phone, SCTE member ID, Reference ID, Submitted
+at. Required columns are Competitor name and Email address — missing
+either fails the upload with a 400. Unknown extra columns are ignored
+without rejection.
+
+In the admin Settings page, under the Broadband Skills Challenge
+section, click "Upload BSC roster (CSV)". The native file picker
+opens filtered to `.csv`. On submit the file is POSTed to
+`/api/bsc-roster-upload` via the admin JWT, parsed server-side, and
+upserted into `bscPreReg` keyed by lowercased email. The response
+renders inline below the upload button as "Imported N competitors.
+M skipped." plus a `<details>` block listing any per-row errors.
+Rows with missing name or email are reported with their row number
+and counted into `skipped`; the import continues through the rest of
+the file.
+
+**Re-upload is an upsert.** A second upload with the same emails
+updates the existing rows in place rather than replacing the whole
+collection. New emails are appended. The design intentionally has NO
+bulk-delete / roster-edit / roster-export UI for v1 — those surfaces
+would need a design pass of their own and the shared BSC Google Sheet
+remains the system of record for roster edits. If you need to remove
+a row, do it in Firestore directly before event-morning, or do it in
+the shared Sheet and re-upload a fresh CSV before go-live.
+
+After a successful upload the status line below the button updates
+to "N competitors in roster · Last imported <relative time>" — this
+reads back from `bscRosterCount` and `bscRosterLastImportedAt` on
+`appSettings/singleton`, which the Function maintains by counting
+`bscPreReg` pages after each upload. If the count refresh fails
+(network blip, 5xx) the import itself still succeeded; the status
+line will show the stale count until a subsequent upload refreshes
+it. The errors block will note "Count refresh failed" so you know to
+re-run.
+
+### Flipping waiver mode
+
+Two radios in the Settings page's BSC section: **Paper** (reminder
+only — attendee sees "please sign the paper waiver at the competition
+table before competing" and the check-in record has empty signature
+fields) and **Electronic** (admin-authored text + agreement checkbox +
+typed-name signature). The seed default is Paper so a mis-flip of
+`bscEnabled` doesn't surface an empty waiver to attendees.
+
+The `bscWaiverText` textarea below the radios holds the full waiver
+text. The "Save waiver text" button is disabled until the local draft
+differs from the server state. Paste legal-reviewed copy here — do
+NOT invent waiver copy inline; chapter counsel must sign off before
+go-live.
+
+**Empty-text fallback.** When mode is set to Electronic but the text
+is empty after trim, the attendee flow silently falls back to paper
+mode (sees the "sign at the table" reminder) and the check-in record
+is stamped `waiver_mode: "paper"`. The admin Settings page surfaces a
+warning banner above the textarea in this state so you know the
+fallback is active. The banner clears reactively as soon as you type
+non-empty text.
+
+### Interpreting the dashboard
+
+`#/bsc-checkins` renders 10 columns in this order: Name, Email,
+Company, Office location, Pre-reg status (green `✓ Pre-registered`
+chip or neutral `Walk-up` chip), Manager approval (green `✓ Yes` or
+warning `✗ No` for walk-ups; `—` for pre-reg where the field is empty
+by design), Waiver mode (neutral `Paper` or brand `Electronic`),
+Waiver signed (relative time + ISO on hover for electronic; literal
+`At table` for paper), Signature name (typed name for electronic;
+empty for paper), Check-in time (relative time + absolute ISO on
+hover).
+
+**Warning rows.** Walk-ups with `manager_approved: "no"` get a
+warning-palette background and a leading warning icon with
+`aria-label="Walk-up without manager approval"`. Scan for these
+during a busy check-in — the attendee answered honestly, their row
+is captured, and a BSC coordinator should follow up before competition
+start.
+
+**Filters and search.** Three segmented controls (Pre-reg status,
+Manager approval, Waiver mode) plus a 150ms-debounced search box that
+matches name OR email case-insensitively. A "Clear filters" button
+appears when any non-default filter is active. Default sort is
+check-in time DESC with reference id ASC as the stable tie-breaker;
+Name and Check-in time column headers are `<button>` elements that
+toggle `aria-sort`.
+
+### Known ceilings and limitations
+
+- **1000-row dashboard ceiling.** `adminReadCollection("bscCheckins",
+  { limit: 1000 })` caps the live dashboard at 1000 rows with no
+  "truncated" indicator. 2027 is budgeted at 200 rows across the
+  entire competition so this is purely a documentation checkpoint. A
+  multi-day deployment would need paging / a "showing N of M" banner
+  before going near this limit.
+- **Reference ID format.** Walk-ups generate `BSC-YYYYMMDD-HHMMSS`
+  with second resolution and no random suffix — matching the 2026
+  Zap's on-the-wire format exactly so downstream Sheet workflows that
+  text-sort on the reference id keep working. Two walk-ups whose
+  waiver-step submits land in the same wall-clock second produce the
+  same reference id. At N=200 walk-ups within a 2-hour window the
+  probability of at least one same-second pair is roughly 50% — this
+  is expected, not a bug. The **pre-launch checklist Section 6b item
+  12** duplicate scan on the shared BSC Google Sheet is the primary
+  mitigation; the BSC coordinator scans the reference id column and
+  resolves collisions by hand (renumbering the second duplicate or
+  appending `-A` / `-B`) before any downstream workflow consumes the
+  data. The Firestore `bscCheckins` rows are keyed by UUID and
+  unaffected.
+- **Paper waiver audit trail.** Paper mode writes empty signature
+  fields on the check-in record. The paper form at the competition
+  table is the signed artifact for insurance / legal purposes — the
+  app only records that the attendee was reminded.
+- **Public-get on the roster.** `bscPreReg` is readable by any
+  attendee client that knows an email AND the public Firestore API key
+  (anyone with the app can read any specific competitor's row
+  including their manager's contact info). The collection is NOT
+  list-able so the full roster cannot be enumerated. If a future
+  revision adds attendee-visible fields to the roster schema,
+  consider whether that field should be visible under the public-get
+  posture or whether the lookup should move behind an authenticated
+  Function.
+
+### Troubleshooting
+
+- **"We recorded your check-in but could not sync with the
+  registration sheet" banner.** The Firestore write succeeded; the
+  BSC Zap POST failed. Check the Zap in Zapier for recent errors on
+  the Catch Hook or the Google Sheets step. The check-in IS in the
+  admin dashboard; manually copy the row into the shared Sheet to
+  reconcile, or ask the attendee to re-check-in after the Zap is
+  restored (will produce a duplicate dashboard row, which the
+  dashboard's sort-by-check-in-time view and the coordinator can
+  dedupe).
+- **"We submitted your check-in to the registration sheet but could
+  not record it in the admin dashboard" banner.** The Zap POST
+  succeeded; the Firestore `bscCheckins` write failed. The shared
+  Sheet has the row; the admin dashboard will not show it until the
+  attendee re-check-ins or an admin manually creates the Firestore
+  doc.
+- **Pre-reg lookup fails on `#/bsc`.** The orchestrator shows an
+  inline error with a Retry button and does NOT silently fall through
+  to walk-up intake (would quietly promote every pre-registered
+  competitor to walk-up on a transient read error). Have the attendee
+  tap Retry; if the error persists, flip them to the walk-up form by
+  entering an email the roster doesn't contain (last resort).
+- **Stale count after a count-refresh failure.** The upload succeeded;
+  the subsequent `bscPreReg` page-sum failed. Re-run the upload with
+  the same CSV; the second pass refreshes the count without duplicating
+  rows (upsert).
+
+---
+
 ## Debug overlay
 
 The attendee app ships with a hidden on-device diagnostic overlay for

@@ -45,7 +45,7 @@ Use for the registered-attendee email list. Send 4-6 weeks out, then a reminder 
 > 2. Tap **Install** when the prompt appears at the bottom, or
 > 3. Tap the **three-dot menu** in the top right and choose **Install app**
 >
-> You'll see the "SCTE Vendor Day" icon on your home screen just like a regular app. Launch it any time — it works even without a signal in parts of the venue.
+> You'll see the "SCTE Vendor Day" icon on your home screen just like a regular app. Launch it any time — it works even without a signal in parts of the venue. If you're also competing in the Broadband Skills Challenge, you can check in for the games right from the app once you've signed in.
 >
 > **See you [DATE], 2027 at the Doubletree Chesterfield.**
 >

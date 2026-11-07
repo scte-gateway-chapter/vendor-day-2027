@@ -21,15 +21,20 @@
 // Zapier) is the source of truth. The design doc covers the rationale.
 "use strict";
 
-import { initFirestore } from "../firebase.js";
-import { loadAppSettings, isSignInEnabled } from "../app-settings.js";
+import { initFirestore, getDoc } from "../firebase.js";
+import { loadAppSettings, isSignInEnabled, isBscEnabled } from "../app-settings.js";
 import * as router from "../router.js";
 import * as ui from "../ui.js";
 import { registerViewCleanup } from "../app.js";
 import { relativeTime } from "../utils/time.js";
+import { installFocusTrap } from "../utils/focus-trap.js";
 
 /** Keys shared with design + requirements for the sign-in flow. */
 const LAST_SUBMISSION_KEY = "vendorday2027.signin.lastSubmission";
+/** BSC pre-reg prompt + return-after-signin flag keys (see design section 17). */
+const BSC_PROMPT_SUPPRESS_KEY = "vendorday2027.bsc.promptSuppressSubmittedAt";
+const BSC_RETURN_AFTER_SIGNIN_KEY = "vendorday2027.bsc.returnAfterSignIn";
+const BSC_PRECHECK_ON_SIGNIN_KEY = "vendorday2027.bsc.preCheckOnSignIn";
 
 /**
  * Render the Sign-In view into `host`.
@@ -166,6 +171,15 @@ function renderNotConfigured(host) {
 function renderForm(host, webhookUrl) {
   host.innerHTML = "";
 
+  // BSC pre-check-on-mount handshake. The flag is read and cleared
+  // immediately so a reload doesn't persist the state (see design
+  // section 17 → flag lifecycle table).
+  let preCheckBsc = false;
+  try {
+    preCheckBsc = sessionStorage.getItem(BSC_PRECHECK_ON_SIGNIN_KEY) === "1";
+    if (preCheckBsc) sessionStorage.removeItem(BSC_PRECHECK_ON_SIGNIN_KEY);
+  } catch (_err) { /* no-op */ }
+
   const intro = document.createElement("p");
   intro.className = "signin-intro";
   intro.textContent = "Sign in so the Gateway Chapter board can confirm attendance. Required fields are marked with *.";
@@ -184,6 +198,25 @@ function renderForm(host, webhookUrl) {
     buildField({ id: "email", name: "email", label: "Email Address", type: "email", required: true, autocomplete: "email" }),
     buildField({ id: "scte-member", name: "scte_member_number", label: "SCTE Member Number", type: "text", required: false, hint: "Optional" }),
   );
+
+  // BSC competitor checkbox — rendered only when the admin has flipped
+  // `bscEnabled` on. When off, no form field is attached and
+  // validateAndCollect sends `bsc_competitor: "no"` on every submit (see
+  // design NIT 8, Option A — the main sign-in Zap column always carries
+  // an explicit value).
+  if (isBscEnabled()) {
+    const bscField = buildField({
+      id: "bsc-competitor",
+      name: "bsc_competitor",
+      label: "I'm competing in the Broadband Skills Challenge today",
+      type: "checkbox",
+    });
+    form.append(bscField);
+    if (preCheckBsc) {
+      const checkbox = bscField.querySelector('input[type="checkbox"]');
+      if (checkbox) checkbox.checked = true;
+    }
+  }
 
   // Inline error/offline banner. Composes `.status-error` for the shared
   // red tone and `.signin-inline-banner` for the local flex layout with an
@@ -212,7 +245,7 @@ function renderForm(host, webhookUrl) {
     ev.preventDefault();
     hideBanner(banner);
 
-    const { ok, firstInvalid, payload } = validateAndCollect(form);
+    const { ok, firstInvalid, payload, bscChecked } = validateAndCollect(form);
     if (!ok) {
       focusFirstInvalid(firstInvalid);
       return;
@@ -231,10 +264,20 @@ function renderForm(host, webhookUrl) {
         name: payload.attendee_name,
         company: payload.company,
         submittedAt,
+        email: (payload.email || "").trim().toLowerCase(),
+        phone: payload.phone || "",
+        office_location: payload.office_location || "",
+        scte_member_number: payload.scte_member_number || "",
       };
       writeLastSubmission(record);
       ui.toast("success", "You're signed in \u2014 thanks!");
       renderConfirmationCard(host, record);
+      // Post-submit BSC routing. Runs after the confirmation card
+      // renders so a slow Firestore GET never delays the attendee's
+      // "You're signed in" feedback.
+      if (isBscEnabled()) {
+        void maybeRouteOrPromptForBsc(record, bscChecked);
+      }
     } catch (err) {
       console.warn("[signin] submit failed:", err);
       showBannerWithRetry(banner, () => form.requestSubmit());
@@ -254,11 +297,37 @@ function renderForm(host, webhookUrl) {
  * Build a `.form-field` block with label + input + inline error slot.
  * `required` adds the red asterisk and marks the input `required`.
  * `hint` is an optional secondary line below the label.
+ *
+ * `type: "checkbox"` builds a wrapper-label pattern (input inside the
+ * label) so the label click toggles the checkbox natively; no inline
+ * error slot is attached because the BSC checkbox is optional and the
+ * electronic-waiver checkbox is gated by a disabled Submit button
+ * rather than per-field validation. Preserve the full signature
+ * (including `autocomplete`) so the BSC flow in `bsc.js` can reuse this
+ * helper without regressing WCAG 1.3.5 Input Purpose on text fields.
+ *
+ * Exported so `public/js/views/bsc.js` can build its intake forms with
+ * the same chrome and the same signature (see design → MEDIUM finding 4).
  */
-function buildField({ id, name, label, type, required, autocomplete, hint }) {
+export function buildField({ id, name, label, type, required, autocomplete, hint }) {
   const wrap = document.createElement("div");
-  wrap.className = "form-field signin-field";
   wrap.dataset.fieldName = name;
+
+  if (type === "checkbox") {
+    wrap.className = "form-field signin-field signin-field--checkbox";
+    const lab = document.createElement("label");
+    lab.setAttribute("for", id);
+    const input = document.createElement("input");
+    input.id = id;
+    input.name = name;
+    input.type = "checkbox";
+    if (required) input.required = true;
+    lab.append(input, document.createTextNode(` ${label}`));
+    wrap.append(lab);
+    return wrap;
+  }
+
+  wrap.className = "form-field signin-field";
 
   const lab = document.createElement("label");
   lab.setAttribute("for", id);
@@ -343,7 +412,14 @@ function validateAndCollect(form) {
   // the public form byte-for-byte.
   payload.signed_in_at = new Date().toLocaleString();
 
-  return { ok: firstInvalid == null, firstInvalid, payload };
+  // BSC competitor flag — always sent on every submit so the main sign-in
+  // Sheet's "BSC Competitor" column is never a mixed blank/yes/no mess
+  // (design NIT 8, Option A). When `bscEnabled === false` the checkbox is
+  // not rendered and the value is "no".
+  const bscCheckbox = form.querySelector('[data-field-name="bsc_competitor"] input');
+  payload.bsc_competitor = bscCheckbox && bscCheckbox.checked ? "yes" : "no";
+
+  return { ok: firstInvalid == null, firstInvalid, payload, bscChecked: !!(bscCheckbox && bscCheckbox.checked) };
 }
 
 function isLikelyEmail(s) {
@@ -432,7 +508,7 @@ function hideBanner(el) {
  * shape so the Zap's Sheet mapping works for both intake paths without
  * changes. Resolves on 2xx; rejects on non-2xx or network error.
  */
-async function postFormEncoded(url, payload) {
+export async function postFormEncoded(url, payload) {
   const body = new URLSearchParams();
   for (const [k, v] of Object.entries(payload)) {
     body.append(k, v == null ? "" : String(v));
@@ -539,6 +615,10 @@ function readLastSubmission() {
       name: parsed.name,
       company: typeof parsed.company === "string" ? parsed.company : "",
       submittedAt: typeof parsed.submittedAt === "string" ? parsed.submittedAt : "",
+      email: typeof parsed.email === "string" ? parsed.email : "",
+      phone: typeof parsed.phone === "string" ? parsed.phone : "",
+      office_location: typeof parsed.office_location === "string" ? parsed.office_location : "",
+      scte_member_number: typeof parsed.scte_member_number === "string" ? parsed.scte_member_number : "",
     };
   } catch (_err) {
     return null;
@@ -556,9 +636,109 @@ function writeLastSubmission(record) {
 function clearLastSubmission() {
   try {
     localStorage.removeItem(LAST_SUBMISSION_KEY);
+    localStorage.removeItem(BSC_PROMPT_SUPPRESS_KEY);
   } catch (err) {
     console.warn("[signin] last-submission clear failed:", err);
   }
+  try {
+    sessionStorage.removeItem(BSC_RETURN_AFTER_SIGNIN_KEY);
+    sessionStorage.removeItem(BSC_PRECHECK_ON_SIGNIN_KEY);
+  } catch (_err) { /* no-op */ }
+}
+
+/* ---------------- BSC post-sign-in routing + pre-reg prompt ---------------- */
+
+/**
+ * After a successful sign-in POST, decide whether to navigate directly
+ * to `#/bsc` or show the pre-reg prompt dialog. Called only when
+ * `isBscEnabled() === true`. Any failure in the Firestore pre-reg
+ * lookup is swallowed with a `console.warn` — the attendee's
+ * confirmation card is never disturbed by a transient read error
+ * (design 14.6.5).
+ */
+async function maybeRouteOrPromptForBsc(record, bscCheckboxWasChecked) {
+  // 1. Return-handshake from a #/bsc deep-link that bounced to sign-in.
+  let returnAfter = null;
+  try { returnAfter = sessionStorage.getItem(BSC_RETURN_AFTER_SIGNIN_KEY); } catch (_err) { /* no-op */ }
+  if (returnAfter === "1") {
+    try { sessionStorage.removeItem(BSC_RETURN_AFTER_SIGNIN_KEY); } catch (_err) { /* no-op */ }
+    router.navigate("/bsc");
+    return;
+  }
+
+  // 2. Attendee explicitly checked the BSC box — go to the BSC flow.
+  if (bscCheckboxWasChecked) {
+    router.navigate("/bsc");
+    return;
+  }
+
+  // 3. Pre-reg prompt eligibility — fire a one-shot roster lookup.
+  const key = (record.email || "").trim().toLowerCase();
+  if (!key) return;
+
+  let suppress = null;
+  try { suppress = localStorage.getItem(BSC_PROMPT_SUPPRESS_KEY); } catch (_err) { /* no-op */ }
+  if (suppress === record.submittedAt) return;
+
+  let doc = null;
+  try {
+    // Raw key — getDoc's docUrl helper already segment-encodes.
+    // Pre-encoding here would double-encode `@` and return null for
+    // every real email (design review HIGH finding 1).
+    doc = await getDoc(`bscPreReg/${key}`);
+  } catch (err) {
+    console.warn("[signin] bscPreReg lookup failed:", err);
+    return; // silent skip on transient read failure
+  }
+  if (!doc) return;
+
+  openPreRegPrompt(record);
+}
+
+function openPreRegPrompt(record) {
+  const container = document.createElement("div");
+  container.className = "bsc-prompt-dialog";
+  container.setAttribute("role", "dialog");
+  container.setAttribute("aria-modal", "true");
+  container.setAttribute("aria-labelledby", "bsc-prereg-heading");
+  container.tabIndex = -1;
+  container.innerHTML = `
+    <div class="bsc-prompt-dialog__backdrop" aria-hidden="true"></div>
+    <div class="bsc-prompt-dialog__panel" role="document">
+      <h2 id="bsc-prereg-heading" class="bsc-prompt-dialog__title">Pre-registered for the Broadband Skills Challenge</h2>
+      <p class="bsc-prompt-dialog__body">
+        It looks like you're already registered to compete. Head to the BSC check-in now?
+      </p>
+      <div class="bsc-prompt-dialog__actions">
+        <button type="button" class="btn-secondary" data-action="dismiss">No thanks</button>
+        <button type="button" class="btn-primary" data-action="go">Yes, take me there</button>
+      </div>
+    </div>
+  `;
+  document.body.append(container);
+
+  function dismiss() {
+    try { localStorage.setItem(BSC_PROMPT_SUPPRESS_KEY, record.submittedAt); } catch (_err) { /* no-op */ }
+    close();
+  }
+  function go() {
+    try { localStorage.removeItem(BSC_PROMPT_SUPPRESS_KEY); } catch (_err) { /* no-op */ }
+    close();
+    router.navigate("/bsc");
+  }
+  let uninstall = null;
+  function close() {
+    try { if (uninstall) uninstall(); } catch (_err) { /* no-op */ }
+    if (container.isConnected) container.remove();
+  }
+
+  container.querySelector('[data-action="dismiss"]').addEventListener("click", dismiss);
+  container.querySelector('[data-action="go"]').addEventListener("click", go);
+
+  uninstall = installFocusTrap(container, {
+    onEscape: dismiss,
+    initialFocus: () => container.querySelector('[data-action="go"]'),
+  });
 }
 
 /**

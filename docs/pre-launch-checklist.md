@@ -680,11 +680,167 @@ for the operational detail.
 
 ---
 
+## Section 6b — BSC check-in
+
+Validates the Broadband Skills Challenge check-in flow end-to-end
+before go-live. All items presume the base app has shipped and
+Sections 1-6a all pass. The feature is gated by the `bscEnabled`
+toggle; expect to flip it OFF again after the walkthrough and ON only
+on event morning.
+
+- [ ] 1. **`ZAPIER_BSC_WEBHOOK_URL` env var set and verified.**
+      Cloudflare → Pages → the project → Settings → Variables and
+      Secrets shows `ZAPIER_BSC_WEBHOOK_URL` present for both
+      Production and Preview. The value matches the Catch Hook URL on
+      the trigger step of the Broadband Skills Challenge Registration
+      2026 Zap in Zapier (currently
+      `https://hooks.zapier.com/hooks/catch/26705916/ux6k1ic/`).
+      _(Req 14.11.2, 14.11.3)_
+
+- [ ] 2. **`bscEnabled` toggle OFF after fresh seed.** Confirm the
+      seed script's default lands as `bscEnabled: false` on
+      `appSettings/singleton`; the admin Settings page's BSC toggle
+      shows "OFF" on first load and the sign-in form does not show
+      the BSC competitor checkbox. _(Req 14.11.1, 14.1.3)_
+
+- [ ] 3. **Toggle flip surfaces the checkbox.** Flip `bscEnabled` to
+      ON in the admin Settings page. Refresh the attendee sign-in
+      view. The "I'm competing in the Broadband Skills Challenge
+      today" checkbox renders between SCTE Member Number and Submit.
+      _(Req 14.1.2, 14.2.1)_
+
+- [ ] 4. **Roster CSV upload lands cleanly.** From the admin Settings
+      page's BSC section, click "Upload BSC roster (CSV)" and pick
+      the exported 2027 competitor roster. The result line shows
+      "Imported N competitors. 0 skipped." with `N` matching the
+      row count in the Sheet. The status line below updates to "N
+      competitors in roster · Last imported just now." _(Req 14.10.4
+      through 14.10.7)_
+
+- [ ] 5. **Pre-reg attendee lands in Firestore + Sheet.** On a device
+      that has NOT previously signed in, sign in with an email that
+      exists in the uploaded roster. Check the BSC box. Submit. The
+      flow routes to `#/bsc` and renders the pre-reg confirmation form
+      pre-filled from the roster (every field tagged with the
+      pre-filled chip). Submit through to the waiver. Submit the
+      waiver per the configured mode. The confirmation screen renders
+      with the "Pre-registered" chip and the roster's reference id.
+      Within ~30 seconds the admin dashboard at `#/bsc-checkins`
+      shows the row; the shared BSC Google Sheet also receives a row
+      via the Zap. Delete both after verification. _(Req 14.3, 14.7,
+      14.8)_
+
+- [ ] 6. **Walk-up attendee lands in Firestore + Sheet.** On a device
+      that has NOT previously signed in, sign in with an email that
+      does NOT exist in the uploaded roster. Check the BSC box.
+      Submit. The flow routes to `#/bsc` and renders the walk-up
+      intake form with the sign-in-known fields pre-filled and the
+      BSC-only fields empty. Submit WITHOUT picking manager approval
+      — the fieldset shows an inline error. Pick "No" and submit
+      through to the waiver. Submit the waiver per the configured
+      mode. The confirmation screen renders with the "Walk-up" chip
+      and a freshly-generated `BSC-YYYYMMDD-HHMMSS` reference id. The
+      admin dashboard row renders with the warning marker (walk-up
+      without manager approval) and the shared Sheet also receives
+      the row via the Zap. Delete both after verification. _(Req
+      14.4, 14.5, 14.7, 14.8)_
+
+- [ ] 7. **Paper waiver mode writes empty signature + reminder.**
+      Set `bscWaiverMode: "paper"` in the admin Settings page. Run
+      item 6 again (or any walk-up test). The attendee sees the
+      "Please sign the paper waiver at the competition table before
+      competing" reminder. The resulting `bscCheckins` row and the
+      Sheet row both have `waiver_mode: "paper"` with empty
+      `waiver_signature` and `waiver_signed_at`. _(Req 14.7.3)_
+
+- [ ] 8. **Electronic waiver with non-empty text captures signature.**
+      Paste a short placeholder waiver into the `bscWaiverText`
+      textarea and Save. Flip `bscWaiverMode` to "electronic". Run
+      item 6 again. The attendee sees the waiver text in a scrollable
+      panel; the Submit button is disabled until BOTH the agreement
+      checkbox is checked AND the signature text input has a non-empty
+      trimmed value. Type a test name, agree, submit. The resulting
+      row has `waiver_mode: "electronic"`, `waiver_signature: "<typed
+      name>"`, and `waiver_signed_at: <ISO timestamp>`. _(Req 14.7.4,
+      14.7.6)_
+
+- [ ] 9. **Electronic + empty text falls back to paper.** Clear
+      `bscWaiverText` and Save (leave `bscWaiverMode: "electronic"`).
+      Confirm the admin Settings page surfaces the warning banner
+      above the textarea. Run item 6 again. The attendee sees the
+      paper reminder (not the electronic read-and-sign flow) and the
+      resulting row is `waiver_mode: "paper"` with empty signature
+      fields. _(Req 14.7.5, 14.9.5)_
+
+- [ ] 10. **Pre-reg prompt fires exactly once per sign-in.** On a
+       device that has NOT previously signed in, sign in with an email
+       in the roster but LEAVE the BSC checkbox unchecked. The sign-in
+       confirmation card renders and the pre-reg prompt dialog opens
+       on top. Tap "No thanks" — the dialog closes. Refresh the page.
+       The confirmation card re-renders and the prompt does NOT
+       re-open. Tap "Sign in as someone else" to clear the local
+       submission, then sign in again as the same person. The prompt
+       re-opens exactly once. _(Req 14.6.1, 14.6.3, 14.6.4)_
+
+- [ ] 11. **Waiver text set to legal-reviewed copy (manual).** Confirm
+       with chapter counsel that the current `bscWaiverText` is the
+       approved copy for the 2027 competition. Record counsel's sign-
+       off below. If the configured mode is Paper, counsel sign-off
+       is advisory only (no electronic waiver will fire). If the mode
+       is Electronic, counsel sign-off is a go/no-go gate.
+
+       | Counsel | Reviewed on | Sign-off | Notes |
+       | --- | --- | --- | --- |
+       |  |  |  |  |
+
+- [ ] 12. **REQUIRED: Reference-ID duplicate scan on the shared BSC
+       Sheet column 10 as PRIMARY mitigation.** The reference id
+       format is `BSC-YYYYMMDD-HHMMSS` (second resolution, no random
+       suffix — matching the 2026 Zap verbatim per brief decision 9
+       and Req 14.4.3). Two walk-ups whose waiver-step submits land
+       in the same wall-clock second produce the same reference id.
+       At N=200 walk-ups within a 2-hour check-in window the
+       probability of at least one same-second pair is roughly 50%.
+       This scan is the PRIMARY mitigation — the BSC coordinator
+       scans the `reference_id` column of the shared BSC Google Sheet
+       at end-of-event and resolves duplicates by hand (renumber the
+       second entry or append `-A` / `-B`) before any downstream
+       workflow consumes the data. Firestore `bscCheckins` rows are
+       keyed by client UUID and are UNAFFECTED — this is strictly
+       about the shared Google Sheet column 10. _(Req 14.4.3)_
+
+- [ ] 13. **Dashboard row ceiling.** `#/bsc-checkins` is capped at
+       1000 rows via `adminReadCollection("bscCheckins", { limit:
+       1000 })`. 2027 is budgeted at 200 check-ins so the ceiling is
+       purely a documentation checkpoint. Confirm the visible count
+       in the dashboard summary strip stays well below 1000 across
+       the event; a count approaching the ceiling signals the need
+       for paging / a "truncated" indicator in a follow-up revision.
+       _(Design section 17 → known ceilings)_
+
+| Item | Who ran | When | Pass / Fail | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | | | | |
+| 2 | | | | |
+| 3 | | | | |
+| 4 | | | | imported = , skipped = |
+| 5 | | | | row id = |
+| 6 | | | | row id = |
+| 7 | | | | row id = |
+| 8 | | | | row id = |
+| 9 | | | | row id = |
+| 10 | | | | |
+| 11 | | | | counsel = |
+| 12 | | | | duplicates found = |
+| 13 | | | | peak dashboard row count = |
+
+---
+
 ## Section 7 — Final go/no-go
 
-- [ ] 1. **Sections 1-6 (including 6a) all pass, OR every failed item
-      has a tracked follow-up.** List each opened follow-up ticket here
-      with its resolution status.
+- [ ] 1. **Sections 1-6 (including 6a and 6b) all pass, OR every
+      failed item has a tracked follow-up.** List each opened
+      follow-up ticket here with its resolution status.
 
       | Follow-up | Opened by | Date | Resolution status |
       | --- | --- | --- | --- |

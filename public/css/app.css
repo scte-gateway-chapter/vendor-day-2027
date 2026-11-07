@@ -2910,3 +2910,223 @@ a:focus-visible {
   .debug-overlay__panel { width: 92vw; }
 }
 
+
+
+/* ---------- Broadband Skills Challenge (#/bsc) ----------
+   Attendee BSC check-in flow styles. The view host (.bsc-view) matches
+   the sign-in body width; sub-steps are DOM swaps inside it. Chips reuse
+   the same success / warning / neutral tokens the admin dashboard uses
+   so the status language reads consistently across surfaces. No new
+   animations — the shared @media (prefers-reduced-motion: reduce) rules
+   above already govern .signin-submit-btn and skeleton rows. */
+
+.bsc-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-md);
+  max-width: 720px;
+  margin: 0 auto;
+}
+.bsc-view .signin-form,
+.bsc-view .signin-form .form-field {
+  background: transparent;
+}
+
+.bsc-step-title {
+  margin: 0;
+}
+.bsc-step-title h3 {
+  margin: 0 0 var(--space-xs);
+  font-size: var(--font-size-lg);
+}
+.bsc-step-title p {
+  margin: 0;
+  color: var(--secondary-text);
+}
+
+.bsc-prefilled-chip {
+  display: inline-block;
+  margin-left: var(--space-xs);
+  padding: 0 var(--space-sm);
+  border-radius: 999px;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success-text);
+  font-size: var(--font-size-sm);
+  line-height: 1.5;
+  vertical-align: middle;
+}
+
+.bsc-manager-approval {
+  margin: 0;
+  padding: var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+.bsc-manager-approval[aria-invalid="true"] {
+  border-color: var(--error-red);
+  background: var(--error-bg);
+}
+.bsc-manager-approval legend {
+  padding: 0 var(--space-xs);
+  font-weight: 600;
+}
+.bsc-manager-approval__option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: var(--space-xs) 0;
+  min-height: 44px;
+}
+.bsc-manager-approval__error {
+  margin-top: var(--space-xs);
+}
+
+.bsc-waiver {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.bsc-waiver-panel {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding: var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.bsc-waiver-panel__text {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--body-text);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height-md);
+}
+.bsc-waiver-panel:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}
+
+.bsc-waiver-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.bsc-waiver-actions {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.bsc-waiver-paper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.bsc-confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+.bsc-confirmation__title {
+  margin: 0 0 var(--space-xs);
+}
+.bsc-confirmation__name {
+  margin: 0;
+  font-weight: 600;
+  font-size: var(--font-size-lg);
+}
+.bsc-confirmation__badges {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+.bsc-confirmation__chip {
+  display: inline-block;
+}
+.bsc-confirmation__ref code {
+  padding: 2px var(--space-xs);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+.bsc-confirmation__reminder {
+  margin: 0;
+  color: var(--secondary-text);
+}
+.bsc-confirmation__actions {
+  margin-top: var(--space-sm);
+}
+
+.bsc-leg-failure-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+  padding: var(--space-sm) var(--space-md);
+  margin: 0 0 var(--space-md);
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-radius: var(--radius);
+}
+
+/* Pre-reg prompt dialog mounted on <body> after a successful sign-in
+   when the attendee is on the roster but didn't check the BSC box.
+   Mounted on body (not inside the view host) so the confirmation card's
+   re-renders can't nuke it mid-interaction. */
+.bsc-prompt-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 9000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+}
+.bsc-prompt-dialog__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+}
+.bsc-prompt-dialog__panel {
+  position: relative;
+  max-width: 420px;
+  width: 100%;
+  background: var(--surface);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+.bsc-prompt-dialog__title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+}
+.bsc-prompt-dialog__body {
+  margin: 0;
+  color: var(--body-text);
+}
+.bsc-prompt-dialog__actions {
+  display: flex;
+  gap: var(--space-sm);
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.bsc-prompt-dialog__actions button:focus-visible {
+  outline: 2px solid var(--brand-green);
+  outline-offset: 2px;
+}

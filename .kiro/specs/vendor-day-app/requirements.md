@@ -198,6 +198,115 @@ The app's year is baked in — 2027. Each future year gets a fresh deployment un
 9. WHEN a prior sign-in submission is stored on the device THEN the Home and Welcome Sign-In entry points SHALL display a high-contrast confirmation using the shared success palette, showing a check icon, a bold "You're signed in" line, the stored attendee name, and a muted "Tap to update" hint; both treatments SHALL remain clickable and SHALL route to `#/sign-in` so the attendee can reach the view and reset.
 10. IF `signInEnabled` is false in `appSettings/singleton` (the fail-closed default — missing, false, or any non-true value) THEN the Welcome CTA, the Home quick-action, the More menu entry, and the Sign-In form on the `#/sign-in` route SHALL all be hidden. The `#/sign-in` route SHALL render a friendly "Sign-in isn't available yet" placeholder for new attendees, OR the stored confirmation card (without the "Sign in as someone else" reset button) for attendees with a prior submission on this device. The admin flips `signInEnabled` through the admin Settings page; the attendee app picks up the new value on the next refresh / launch (no live Firestore listener).
 
+### Requirement 14 — Broadband Skills Challenge Check-In
+
+**User Story:** As a Vendor Day attendee who is also competing in the Broadband Skills Challenge, I want to check in for the competition from inside the app after I sign in, so that my pre-registration is confirmed (or captured on the fly if I'm walking up), I sign the required waiver, and the BSC coordinators know I've arrived — without a second paper form queue at the hotel.
+
+#### 14.1 Admin Gating (`bscEnabled`)
+
+1. WHEN the admin opens the admin Settings page THEN the system SHALL render a `bscEnabled` ARIA switch using the same chrome as the existing `signInEnabled` toggle (pill + "LIVE/OFF" copy slot).
+2. WHEN the admin flips `bscEnabled` THEN the system SHALL write `{ bscEnabled: <bool> }` to `appSettings/singleton` via `/api/firestore-write` using `op: "update"` so other fields on the document are preserved.
+3. IF `bscEnabled` is `false` on `appSettings/singleton` (including missing, null, or any non-`true` value — fail-closed) THEN the system SHALL hide the BSC competitor checkbox from the sign-in form, hide every attendee-side entry point to `#/bsc` and `#/bsc/*`, and SHALL NOT present the "pre-registered — want to check in?" prompt described in 14.6.
+4. IF `bscEnabled` is `false` AND an attendee navigates directly to `#/bsc` (or any `#/bsc/*` subroute) by bookmark or deep link THEN the system SHALL render a friendly "BSC check-in isn't available yet" placeholder with a Back-to-Home control and SHALL NOT execute any roster lookup, waiver, or submit logic.
+5. IF `bscEnabled` is `false` AND the admin navigates to `#/bsc-checkins` THEN the system SHALL render the dashboard shell with a "BSC is currently disabled" notice in place of the live list; the route itself SHALL remain reachable so admins can confirm the state and flip the toggle without leaving the view.
+6. WHEN the attendee app loads `appSettings/singleton` THEN the system SHALL read it through the shared one-shot cache in `public/js/app-settings.js` (same path as `signInEnabled`) and SHALL NOT establish a live Firestore listener for `bscEnabled` on the attendee side; admin changes take effect on the next page refresh or route change, matching the existing `signInEnabled` cadence.
+7. WHEN `bscEnabled` flips from `true` to `false` while an attendee is partway through a BSC form THEN the system SHALL allow the in-progress submit to complete so a check-in isn't lost mid-flow; subsequent attempts SHALL honor the new `false` state.
+
+#### 14.2 Sign-In Form Integration
+
+1. WHEN `bscEnabled` is `true` AND the sign-in form is rendered THEN the system SHALL add a labeled "I'm competing in the Broadband Skills Challenge today" checkbox below the existing fields and above the submit button, with keyboard focus order placing the checkbox between SCTE Member Number and Submit.
+2. WHEN the sign-in form is submitted THEN the system SHALL append a `bsc_competitor` field (lowercase `"yes"` if the checkbox is checked, `"no"` otherwise) to the existing `application/x-www-form-urlencoded` POST payload sent to `signInWebhookUrl`; no other sign-in payload fields SHALL change behavior.
+3. WHEN the sign-in form submission succeeds THEN the system SHALL extend the `localStorage` record at `vendorday2027.signin.lastSubmission` to include `email`, `phone`, `office_location`, and `scte_member_number` fields in addition to the existing `name`, `company`, and `submittedAt`.
+4. IF the stored submission object on this device lacks any of `email`, `phone`, `office_location`, or `scte_member_number` (e.g., it was written by a prior build) THEN the system SHALL treat each missing field as an empty string (`""`), never `null` or `undefined`, so downstream consumers can rely on the shape.
+5. WHEN the sign-in submission succeeds AND the BSC checkbox was checked AND `bscEnabled` is `true` THEN the system SHALL navigate the attendee to `#/bsc` after the confirmation toast, carrying the just-captured sign-in values as the starting data for the BSC flow.
+6. WHEN the sign-in form is rendered AND the device arrives from a `#/bsc` → `#/sign-in` redirect (see 14.4) THEN the system SHALL pre-check the BSC checkbox so the attendee does not have to re-tick it before submitting.
+
+#### 14.3 Pre-Reg Roster Lookup
+
+1. WHEN an attendee lands on `#/bsc` with starting data available THEN the system SHALL look the attendee up in Firestore `bscPreReg` using the lowercased, trimmed email as the document id, via the same client-side read pattern used by other attendee Firestore views (no new Pages Function).
+2. WHEN the `bscPreReg` document exists for the attendee's email THEN the system SHALL render a "Confirm your Broadband Skills Challenge check-in" view pre-populating every field known from the roster (competitor name, email, company, office location, job role, supervisor name, supervisor email, supervisor phone, SCTE member id, reference id) in editable but clearly-identified-as-prefilled inputs, SHALL mark the attendee as `entry_type: "pre-registered"`, and SHALL skip the manager-approval attestation.
+3. WHEN the `bscPreReg` document does not exist for the attendee's email THEN the system SHALL render the walk-up intake form described in 14.4, defaulting any starting-data fields (name, email, company, office location, SCTE member) from the sign-in payload while leaving BSC-only fields (job role, supervisor name, supervisor email, supervisor phone) empty, and SHALL mark the attendee as `entry_type: "walk-up"`.
+4. WHEN the pre-reg lookup fails (network error, Firestore 5xx, timeout) THEN the system SHALL show an inline error with a Retry affordance; the system SHALL NOT fall back to the walk-up form on lookup failure (a transient read error must not silently promote a pre-registered competitor to a walk-up).
+5. WHEN the attendee is pre-registered THEN the system SHALL reuse the roster's existing reference id (column 10 of the CSV) in the check-in record and in the Zap payload rather than generating a new one.
+6. IF the attendee's starting data is missing an email (e.g., they haven't signed in on this device yet) THEN the system SHALL redirect to `#/sign-in` with the BSC pre-check flag set (see 14.2.6) and SHALL NOT attempt a lookup against a blank id.
+
+#### 14.4 Walk-Up Intake
+
+1. WHEN the walk-up form is rendered THEN the system SHALL show inputs for competitor name (required), email (required), company (required), office location (required), job role / title (required), supervisor name (required), supervisor email (required), supervisor phone (required), SCTE member id (optional), and a manager-approval attestation (see 14.5).
+2. WHEN the walk-up form is submitted THEN the system SHALL validate client-side using the same permissive rules used by the existing sign-in form (non-empty for required text fields, basic email shape for email fields, at least seven digits for phone fields) and SHALL focus the first invalid field on failure.
+3. WHEN the walk-up form submits successfully THEN the system SHALL generate a fresh reference id on the client in the format `BSC-YYYYMMDD-HHMMSS` using local device time, matching the 2026 Zap's format.
+4. WHEN an attendee navigates to `#/bsc` without having completed the Vendor Day sign-in on this device (no `vendorday2027.signin.lastSubmission` record OR a record missing `email`) THEN the system SHALL redirect to `#/sign-in` with a session flag that pre-checks the BSC box (14.2.6) and routes the attendee back to `#/bsc` upon successful sign-in.
+5. WHEN starting data includes an email, name, company, office location, or SCTE member number from the sign-in form THEN the system SHALL pre-populate those fields in the walk-up form; the attendee SHALL still be able to edit any pre-populated value.
+6. WHEN the walk-up form is submitted THEN the walk-up SHALL NOT be rejected on the basis of the attendee declining manager approval; the record SHALL be captured with `manager_approved: "no"` and flagged in the admin dashboard per 14.5.
+
+#### 14.5 Manager-Approval Attestation
+
+1. WHEN the walk-up form is rendered THEN the system SHALL show a clearly labeled manager-approval attestation ("I have my manager's approval to compete today") as a two-choice control (Yes / No) with no default selection, placed above the submit button.
+2. IF the attendee selects "Yes" THEN the system SHALL record `manager_approved: "yes"` in the Firestore `bscCheckins` document and in the Zap webhook payload.
+3. IF the attendee selects "No" THEN the system SHALL record `manager_approved: "no"` and SHALL allow the submission to proceed to the waiver step; the dashboard presentation requirements in 14.8.3 apply.
+4. IF the attendee submits the walk-up form without picking Yes or No THEN the system SHALL show an inline validation error on the attestation control, focus it, and block the submit until a choice is made.
+5. WHEN a pre-registered attendee flows through 14.3 THEN the system SHALL NOT display the manager-approval attestation and SHALL write `manager_approved: ""` (empty string, not null or absent) in the check-in record and Zap payload.
+
+#### 14.6 Pre-Reg Prompt After Regular Sign-In
+
+1. WHEN the sign-in form submits successfully AND the submitter did NOT check the BSC checkbox AND `bscEnabled` is `true` AND a `bscPreReg` document exists for the submitter's lowercased email THEN the system SHALL show a non-blocking prompt on top of (or inline with) the sign-in confirmation card worded along the lines of "We see you're pre-registered for the Broadband Skills Challenge today. Want to check in for that now?" with two actions: "Yes, take me there" and "No thanks".
+2. WHEN the attendee taps "Yes, take me there" THEN the system SHALL navigate to `#/bsc` carrying the just-captured sign-in values as starting data (identical to the pre-check path in 14.2.5).
+3. WHEN the attendee taps "No thanks" THEN the system SHALL dismiss the prompt, return to the normal sign-in confirmation card, and SHALL write a `localStorage` flag that suppresses the prompt for the remainder of the current `vendorday2027.signin.lastSubmission` so page refreshes do not re-nag.
+4. WHEN the attendee resets their sign-in (clears `vendorday2027.signin.lastSubmission` via the "Sign in as someone else" link) THEN the suppression flag in 14.6.3 SHALL be cleared along with the submission record so a new attendee on the same device still gets prompted if applicable.
+5. IF the `bscPreReg` lookup required for the prompt fails (network error, Firestore 5xx) THEN the system SHALL silently skip the prompt rather than blocking the sign-in confirmation UX; a missed prompt is strictly less bad than a stalled success state.
+6. WHEN the prompt is open THEN the system SHALL expose it to assistive tech with `role="dialog"` and a labeled heading, trap focus until it is dismissed, and support Escape-to-close (equivalent to "No thanks").
+
+#### 14.7 Waiver Step and Mode Fallback
+
+1. WHEN an attendee submits either the pre-reg confirmation form (14.3.2) or the walk-up form (14.4) THEN the system SHALL route them to the waiver step before writing the check-in to Firestore or POSTing to the BSC Zap.
+2. WHEN the waiver step is rendered THEN the system SHALL read `bscWaiverMode` and `bscWaiverText` from the shared `appSettings/singleton` cache; `bscWaiverMode` SHALL be `"paper"` by default and `"paper"` or `"electronic"` otherwise.
+3. IF `bscWaiverMode` is `"paper"` THEN the system SHALL render a reminder screen stating "Please sign the paper waiver at the competition table before competing", a prominent Confirm button, and SHALL NOT capture any typed signature or agreement checkbox; the resulting check-in record SHALL set `waiver_mode: "paper"`, `waiver_signature: ""`, and `waiver_signed_at: ""`.
+4. IF `bscWaiverMode` is `"electronic"` AND `bscWaiverText` is a non-empty string after trimming THEN the system SHALL render the waiver text inside a scrollable panel, an "I have read and agree" checkbox, a "Type your full legal name as signature" text input, and a Submit button that is disabled until both the checkbox is checked AND the signature field contains a non-empty trimmed string.
+5. IF `bscWaiverMode` is `"electronic"` AND `bscWaiverText` is empty (missing, null, or whitespace-only) THEN the attendee-side waiver step SHALL defensively fall back to paper mode (render the paper reminder in 14.7.3) and SHALL write `waiver_mode: "paper"` on the resulting check-in record; the admin Settings page SHALL display a warning in this state per 14.9.5.
+6. WHEN the attendee submits an electronic waiver THEN the system SHALL set `waiver_mode: "electronic"`, `waiver_signature: <trimmed-signature-string>`, and `waiver_signed_at: <ISO timestamp at submit>` in both the Firestore check-in record and the Zap payload.
+7. WHEN the waiver submit succeeds THEN the system SHALL show a confirmation screen summarizing the attendee's name, entry type (Pre-registered / Walk-up), waiver mode, reference id, and (for paper mode) the "sign at the table" reminder.
+8. WHEN the waiver submit fails (network error, non-2xx response from Firestore write or the Zap webhook) THEN the system SHALL show an inline error with Retry, preserve the attendee's typed signature value, and SHALL NOT silently drop the submission.
+
+#### 14.8 Check-In Persistence and Admin Dashboard
+
+1. WHEN the waiver step submits successfully THEN the system SHALL write a `bscCheckins` document to Firestore containing `attendee_name`, `email` (lowercased), `company`, `office_location`, `job_role`, `supervisor_name`, `supervisor_email`, `supervisor_phone`, `scte_member_id`, `reference_id`, `submitted_at`, `entry_type`, `manager_approved`, `waiver_mode`, `waiver_signature`, `waiver_signed_at`, and a server timestamp for ordering; the client SHALL also POST the same shape (minus the server timestamp) as `application/x-www-form-urlencoded` to the BSC Zap webhook URL in `bscWebhookUrl` from `/api/config`.
+2. WHEN the admin opens `#/bsc-checkins` THEN the system SHALL render columns in this order: Name, Email, Company, Office location, Pre-reg status (badge: ✓ Pre-registered / Walk-up), Manager approval (walk-ups only: ✓ Yes / ✗ No; pre-registered rows show `—`), Waiver mode (Paper / Electronic), Waiver signed (ISO timestamp for electronic, `"At table"` for paper), Signature name (electronic only, empty for paper), Check-in time.
+3. WHEN a walk-up row has `manager_approved: "no"` THEN the system SHALL visually mark that row prominently (e.g., warning-colored status chip and an accessible label) so the BSC coordinator can follow up during the event.
+4. WHEN the dashboard is rendered THEN the system SHALL expose sort controls on Name and Check-in time, filter controls for Pre-reg status, Manager-approval status, and Waiver mode, and a search box that filters by name or email (case-insensitive substring match on the trimmed field values).
+5. WHEN the dashboard is open THEN the system SHALL poll `bscCheckins` on the same 30-second cadence used by other admin editors (no real-time Firestore listener per the out-of-scope list in the brief).
+6. WHEN the dashboard poll fails THEN the system SHALL preserve the last-rendered rows, show an inline error banner with Retry, and SHALL NOT clear the table or scroll state on transient read errors.
+7. IF `bscEnabled` is `false` THEN the dashboard SHALL render the "BSC is currently disabled" state per 14.1.5 instead of fetching rows.
+8. WHEN the Zap webhook POST fails but the Firestore write succeeds (or vice versa) THEN the system SHALL log a console warning identifying which leg failed; the attendee SHALL see a non-fatal "we recorded your check-in but could not sync with the registration sheet, please notify a BSC coordinator" message rather than a hard failure, so a Sheet-only outage does not block check-ins.
+
+#### 14.9 Admin Settings Additions
+
+1. WHEN the admin opens the Settings page THEN the system SHALL render, in this order below the existing Sign-In toggle: `bscEnabled` toggle, `bscWaiverMode` two-state control (Paper / Electronic), `bscWaiverText` textarea, "Upload BSC roster (CSV)" button, and a read-only status line showing the current roster count and the last-import timestamp.
+2. WHEN the `bscWaiverMode` control is interacted with THEN the system SHALL write `{ bscWaiverMode: "paper" | "electronic" }` to `appSettings/singleton` via `/api/firestore-write` with `op: "update"` and SHALL toast success / failure using the same inline banner pattern as the Sign-In toggle.
+3. WHEN the admin edits the `bscWaiverText` textarea THEN the system SHALL expose a save control (button or blur-driven save, matching whatever pattern is already in the admin UI for similarly-sized text fields) and SHALL write `{ bscWaiverText: <string> }` to `appSettings/singleton` via `/api/firestore-write` with `op: "update"`; the textarea SHALL show a placeholder "Paste your legal-approved waiver text here. Required when waiver mode is set to Electronic." and SHALL NOT be pre-populated with any invented waiver copy.
+4. WHEN the admin UI anywhere else surfaces a character count on textareas THEN the `bscWaiverText` textarea SHALL show a character count using the same component; otherwise no character count is required.
+5. IF `bscWaiverMode` is `"electronic"` AND `bscWaiverText` is empty (trimmed) THEN the Settings page SHALL show a visible warning next to the waiver controls stating that the attendee flow will fall back to paper mode until waiver text is populated; the warning SHALL NOT block saving either field independently.
+6. WHEN the admin clicks "Upload BSC roster (CSV)" THEN the system SHALL open the native file picker filtered to `.csv`, POST the chosen file as `multipart/form-data` to `/api/bsc-roster-upload`, and show an inline progress / result message of the form "Imported 41 pre-registered competitors. 0 skipped." derived from the server response.
+7. WHEN the upload completes successfully THEN the system SHALL refresh the roster-count and last-imported-at status line without a full page reload.
+8. WHEN the upload fails THEN the system SHALL render the server-side error list (`errors[]` in the response) in a readable form and SHALL NOT update the local status line.
+
+#### 14.10 Pre-Reg Roster Upload (`/api/bsc-roster-upload`)
+
+1. WHEN a request arrives at `/api/bsc-roster-upload` THEN the system SHALL require the admin JWT using the same auth pattern as `/api/firestore-write`; unauthenticated or expired-token requests SHALL return `401` and SHALL NOT touch Firestore.
+2. WHEN an authenticated request arrives with a `multipart/form-data` body containing a CSV file field THEN the system SHALL parse the CSV, matching headers case-insensitively and whitespace-tolerantly against the known schema (Competitor name, Email address, Company, Office location, Job role / title, Supervisor / Manager name, Supervisor / Manager email, Supervisor / Manager phone, SCTE member ID, Reference ID, Submitted at). Unknown extra columns SHALL NOT cause rejection; they SHALL be ignored.
+3. IF the uploaded file is not a CSV, exceeds a reasonable upper bound (choose a sensible limit at design time; the 2026 file has 41 rows), or cannot be parsed at all THEN the system SHALL return `400` with a JSON body `{ imported: 0, skipped: 0, errors: [<human-readable message>] }`.
+4. WHEN parsing each row THEN the system SHALL trim whitespace around every value and SHALL skip any row missing either competitor name or email; skipped rows SHALL increment the `skipped` counter and SHALL be reported in the `errors` array with the row number.
+5. WHEN upserting a valid row THEN the system SHALL use `set` with `merge: true` on `bscPreReg/<lowercased-trimmed-email>`, writing every field from the row plus `importedAt: serverTimestamp()`; an existing document for the same email SHALL be updated in place rather than replaced wholesale, preserving any additional fields written by future features.
+6. WHEN the upload completes THEN the system SHALL update `appSettings/singleton.bscRosterCount` to the current `bscPreReg` collection count and `bscRosterLastImportedAt` to a server timestamp, both via the service account's Firestore client.
+7. WHEN the upload completes THEN the response SHALL be a JSON body of the shape `{ imported: <n>, skipped: <m>, errors: [<string>, ...] }` with a `200` status; `imported` SHALL count only rows that were upserted successfully.
+8. WHEN a re-upload is performed after a late addition THEN the system SHALL add the new person without deleting prior roster entries; the brief explicitly rules out any bulk-delete, roster-edit, or roster-export UI for v1.
+
+#### 14.11 Seed and Configuration
+
+1. WHEN `scripts/seed-app-settings.js` runs THEN it SHALL include `bscEnabled: false`, `bscWaiverMode: "paper"`, `bscWaiverText: ""`, `bscRosterCount: 0`, and `bscRosterLastImportedAt: null` in the seeded `appSettings/singleton` document, alongside the existing fields.
+2. WHEN `/api/config` responds THEN the body SHALL include `bscWebhookUrl: env.ZAPIER_BSC_WEBHOOK_URL || null` alongside the existing fields; no other secret SHALL be added.
+3. IF `ZAPIER_BSC_WEBHOOK_URL` is unset in the Cloudflare env THEN the attendee BSC flow SHALL render a graceful "BSC check-in is not yet configured" placeholder on `#/bsc` (same pattern as the sign-in view handles a missing `signInWebhookUrl`) and SHALL log a console warning rather than throwing.
+4. WHEN any client code reads the BSC Zap URL THEN it SHALL come from `bscWebhookUrl` on `/api/config`; the system SHALL NOT hardcode `https://hooks.zapier.com/hooks/catch/26705916/ux6k1ic/` (or any webhook URL) anywhere in `public/`.
+
 ## Resolved Decisions
 
 The following decisions have been confirmed by the user and are locked for design:
@@ -216,6 +325,7 @@ The following decisions have been confirmed by the user and are locked for desig
 - **Office Location field**: Captured by the Sign-In form and sent to the Sheet, but intentionally not surfaced in the in-app attendee directory.
 - **Sign-in spam protection**: Client-side validation only, matching the GoDaddy form. No honeypot, no CAPTCHA.
 - **Attendee Sign-In admin gate**: The in-app Sign-In surfaces (Welcome CTA, Home quick-action, More menu entry, and the `#/sign-in` route itself) are gated behind a `signInEnabled` boolean on `appSettings/singleton`. Default is `false` (fail-closed — a missing or non-true value is treated as off), and the attendee app picks up admin changes on the next refresh / launch (no live listener). Admins flip the toggle from the admin Settings page. The gate only governs in-app surfaces; the GoDaddy sign-in page is independent and keeps its own availability controls.
+- **Broadband Skills Challenge check-in**: BSC check-in is gated by a fail-closed `bscEnabled` toggle on `appSettings/singleton` (default `false`). Waiver mode defaults to `"paper"` (reminder only, no e-signature); electronic mode is admin-authored text + typed-name signature with a defensive fallback to paper when the text is empty. The pre-registration roster is managed by uploading a CSV through the admin UI (merge-upsert keyed by lowercased email; no bulk-delete / edit / export UI in v1). The BSC Zap and the Firestore `bscCheckins` collection are both authoritative for different consumers: the shared BSC Google Sheet is the BSC coordinator's single source of truth; `bscCheckins` powers the admin dashboard. Reference id format `BSC-YYYYMMDD-HHMMSS` matches the 2026 Zap; the pre-launch duplicate scan is the primary mitigation for same-second collisions among walk-ups.
 
 ## Confirmed Context
 
@@ -227,3 +337,4 @@ These facts are confirmed and should be treated as inputs to the design, not ass
 - **Content layer**: Lightweight free-tier data store supporting admin writes without redeploying the app. Specific service to be chosen in design.
 - **Attendee directory source**: Google Sheet maintained by the registration process.
 - **Admin surface**: One responsive admin UI serves both the installed PWA on a phone and any desktop browser. No separate desktop-only console.
+- **Pre-registration roster source**: Google Sheet maintained by the chapter via the existing Broadband Skills Challenge Registration 2026 Zap; exported as CSV and uploaded through the admin UI.
