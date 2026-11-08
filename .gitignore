@@ -17,3 +17,8 @@ Thumbs.db
 # Logs and build output
 *.log
 dist/
+
+# Local reference data (contains attendee/competitor PII — keep out of git)
+*.xlsx
+# Workflow artifacts (ephemeral task state created by multi-agent runs)
+.agents/
