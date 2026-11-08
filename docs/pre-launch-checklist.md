@@ -626,6 +626,20 @@ for the operational detail.
       chapter rotated the Zap at any point, this file was updated to
       match. _(Req 13.2)_
 
+- [ ] 5. **Sign-in Zap trigger sample is fresh and mappings are
+      current.** Zapier caches trigger samples across seasons; a
+      reused Zap can map new webhook payloads against last year's
+      field names, leaving some Sheet columns blank. In the Zap
+      editor: open the Catch Hook trigger step → **Test** → **Find
+      new records** → pick a sample from a recent in-app sign-in →
+      Save. Open the Google Sheets action step; confirm every field
+      mapping points at a current webhook field (not a greyed-out /
+      "field not found" placeholder) and that the sample preview
+      values match the test row from item 2. Click **Publish**; the
+      editor badge should go from `Draft` to clean. Fire one more
+      in-app test row after publish and confirm every column in the
+      Sheet populates. _(Req 13.2 — operational verification)_
+
 - [ ] 5. **Admin Settings page shows the Sign-In toggle OFF after a
       fresh seed.** Admin → **Settings**. The **Attendee Sign-In**
       row renders with an **OFF** pill and the helper text explaining
@@ -696,6 +710,20 @@ on event morning.
       2026 Zap in Zapier (currently
       `https://hooks.zapier.com/hooks/catch/26705916/ux6k1ic/`).
       _(Req 14.11.2, 14.11.3)_
+
+- [ ] 1a. **BSC Zap trigger sample is fresh and mappings are current.**
+      Same staleness risk as the sign-in Zap, same fix pattern. In the
+      BSC Zap editor: open the Catch Hook trigger step → **Test** →
+      **Find new records** → pick a sample from a recent in-app BSC
+      check-in → Save. Open the Google Sheets action step; confirm
+      every column in the Sheet is mapped to a current webhook field
+      (specifically Competitor name → `attendee_name`, Email address →
+      `email`, Supervisor fields → `supervisor_name/email/phone`,
+      etc.) with sample values from the current payload. Click
+      **Publish**; the editor badge should go from `Draft` to clean.
+      Fire one in-app check-in after publish and confirm every
+      expected column in the BSC Sheet populates. _(Req 14.11.3 —
+      operational verification)_
 
 - [ ] 2. **`bscEnabled` toggle OFF after fresh seed.** Confirm the
       seed script's default lands as `bscEnabled: false` on

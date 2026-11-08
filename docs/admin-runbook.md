@@ -588,6 +588,59 @@ Sign-ins not landing in the Sheet:
    It shows the BUILD_ID the device is actually running, whether
    `signInWebhookUrl` reached the device via `/api/config`, and a
    rolling event feed. See **Debug overlay** below.
+6. **If some Sheet columns populate but others are blank,** the Zap's
+   trigger sample is stale. See **Zapier staleness** below.
+
+### Zapier staleness — why reused Zaps need re-sampling each year
+
+This applies to both the sign-in Zap and the BSC Zap, and to any future
+Zap we reuse to stay on the free tier.
+
+**What happens:** Zapier's trigger step caches a "sample" of a past
+webhook POST. The field mappings in each action step bind to names
+from that cached sample. When the published Zap receives a new
+webhook, Zapier runs the actions but **does NOT automatically refresh
+the cached trigger sample**. If the app's payload field names change
+between seasons (we added fields, renamed a field, or reused a Zap
+across a schema change), the mapping dropdowns in the editor still
+show the OLD field names and new fields never appear.
+
+**The symptom:** some Sheet columns populate on new submissions, but
+others go blank. The columns that match the OLD sample field names
+work. The columns bound to field names that don't exist in the new
+payload stay blank. The columns bound to new field names that aren't
+yet in Zapier's cached sample can't be mapped at all.
+
+**The fix (one-time per Zap, per schema change):**
+
+1. In the Zap editor, open the Catch Hook trigger step.
+2. Click **Test** or scroll to the Test section.
+3. Click **Find new records** / **Load more** to force Zapier to pull
+   recent webhook POSTs.
+4. Pick a recent POST that reflects the current payload. If no recent
+   POST exists, fire a test from the live app or send one with `curl`
+   so Zapier has something fresh to catch.
+5. Save the trigger step. The new fields are now available in the
+   action step dropdowns.
+6. Open each downstream action step (Google Sheets, Email, etc.) and
+   re-verify every field mapping. Zapier does NOT auto-remap when the
+   sample changes.
+7. **Click Publish.** The editor badge shows `Draft` until you do, and
+   the Zap keeps running the previously-published mappings even if the
+   editor looks correct.
+
+**Pre-launch verification pattern:**
+
+For each reused Zap, fire a representative test POST (from the live
+app, not just `curl`) and confirm every expected column appears in the
+Sheet with the right value. Do this at least a week before the event
+so there's time to fix a stale mapping without pressure.
+
+Known caveat: `curl` POSTs from a laptop sometimes don't show up in
+the Zapier editor's **"Find new records"** list even when the webhook
+accepted them with HTTP 200. If `curl` samples don't appear, fire the
+test from the real app URL in a browser and the sample will show up
+reliably within a few seconds.
 
 ### Attendees who sign in and the Attendee Directory
 
@@ -880,6 +933,11 @@ toggle `aria-sort`.
   competitor to walk-up on a transient read error). Have the attendee
   tap Retry; if the error persists, flip them to the walk-up form by
   entering an email the roster doesn't contain (last resort).
+- **Some BSC Sheet columns populate but others are blank** (e.g.,
+  Competitor name and Email address stay empty while the rest fill
+  in). The Zap's trigger sample is stale from a prior season.
+  See **Zapier staleness** in the Sign-In Integration section above —
+  the fix pattern is identical for the BSC Zap.
 - **Stale count after a count-refresh failure.** The upload succeeded;
   the subsequent `bscPreReg` page-sum failed. Re-run the upload with
   the same CSV; the second pass refreshes the count without duplicating
