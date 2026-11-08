@@ -28,6 +28,14 @@ import * as ui from "../ui.js";
 import { registerViewCleanup } from "../app.js";
 import { relativeTime } from "../utils/time.js";
 import { installFocusTrap } from "../utils/focus-trap.js";
+import { pushDebugLog } from "../debug-log.js";
+
+/** Retroactive BSC-flip POST timeout. Zapier Catch Hook responses in the
+ *  field are consistently sub-second; 5 seconds is a conservative cap that
+ *  guarantees the user's `#/bsc` navigation never stalls behind a hung
+ *  webhook. See design section 17 ("Retroactive sign-in update") and
+ *  requirement 14.6.7. */
+const BSC_RETROACTIVE_POST_TIMEOUT_MS = 5000;
 
 /** Keys shared with design + requirements for the sign-in flow. */
 const LAST_SUBMISSION_KEY = "vendorday2027.signin.lastSubmission";
@@ -274,9 +282,12 @@ function renderForm(host, webhookUrl) {
       renderConfirmationCard(host, record);
       // Post-submit BSC routing. Runs after the confirmation card
       // renders so a slow Firestore GET never delays the attendee's
-      // "You're signed in" feedback.
+      // "You're signed in" feedback. The original `payload` and the
+      // `webhookUrl` ride along so the pre-reg prompt's Yes-path can
+      // fire a retroactive `bsc_competitor=yes` POST without rebuilding
+      // the form shape (see requirement 14.6.7 / design section 17).
       if (isBscEnabled()) {
-        void maybeRouteOrPromptForBsc(record, bscChecked);
+        void maybeRouteOrPromptForBsc(record, bscChecked, payload, webhookUrl);
       }
     } catch (err) {
       console.warn("[signin] submit failed:", err);
@@ -655,8 +666,17 @@ function clearLastSubmission() {
  * lookup is swallowed with a `console.warn` — the attendee's
  * confirmation card is never disturbed by a transient read error
  * (design 14.6.5).
+ *
+ * @param {object} record  the attendee's confirmation-card record (normalized subset)
+ * @param {boolean} bscCheckboxWasChecked  whether the attendee checked the BSC box
+ * @param {object} originalPayload  the exact object just POSTed to the sign-in Zap
+ *   (used by the Yes-path of the pre-reg prompt to fire a retroactive
+ *   `bsc_competitor=yes` POST without rebuilding the field shape).
+ * @param {string} webhookUrl  the sign-in Zap webhook URL (same URL the
+ *   original POST targeted; threaded through so the pre-reg prompt can
+ *   reach it without re-reading `/api/config`).
  */
-async function maybeRouteOrPromptForBsc(record, bscCheckboxWasChecked) {
+async function maybeRouteOrPromptForBsc(record, bscCheckboxWasChecked, originalPayload, webhookUrl) {
   // 1. Return-handshake from a #/bsc deep-link that bounced to sign-in.
   let returnAfter = null;
   try { returnAfter = sessionStorage.getItem(BSC_RETURN_AFTER_SIGNIN_KEY); } catch (_err) { /* no-op */ }
@@ -692,10 +712,35 @@ async function maybeRouteOrPromptForBsc(record, bscCheckboxWasChecked) {
   }
   if (!doc) return;
 
-  openPreRegPrompt(record);
+  openPreRegPrompt(record, originalPayload, webhookUrl);
 }
 
-function openPreRegPrompt(record) {
+/**
+ * Build and mount the pre-reg prompt dialog. The "Yes, take me there"
+ * path fires a retroactive sign-in POST so the Google Sheet row for
+ * this attendee reflects their actual BSC participation (see
+ * requirement 14.6.7 / design section 17 → "Retroactive sign-in
+ * update"). The retroactive POST is intentionally non-blocking: the
+ * dialog dismisses and navigation to `#/bsc` happens immediately on
+ * click so the attendee never sees a spinner or stall; the POST
+ * completes in the background with a 5-second timeout cap and
+ * success/failure is surfaced through the debug overlay.
+ *
+ * The retroactive POST ONLY fires on the Yes path. The "No thanks"
+ * button and the Escape / backdrop dismiss paths represent the
+ * attendee declining BSC, so the first POST's `bsc_competitor=no` is
+ * correct for them and no second POST is issued.
+ *
+ * @param {object} record  the stored confirmation record (used for
+ *   suppression keying and dialog state only)
+ * @param {object} originalPayload  the exact object just POSTed to the
+ *   sign-in Zap on submit. The retroactive POST reuses every field
+ *   (critically `signed_in_at`, so the two sheet rows correlate to the
+ *   same sign-in event) and overrides only `bsc_competitor`.
+ * @param {string} webhookUrl  the sign-in Zap webhook URL (same URL the
+ *   original POST targeted).
+ */
+function openPreRegPrompt(record, originalPayload, webhookUrl) {
   const container = document.createElement("div");
   container.className = "bsc-prompt-dialog";
   container.setAttribute("role", "dialog");
@@ -722,6 +767,49 @@ function openPreRegPrompt(record) {
     close();
   }
   function go() {
+    // Retroactive sign-in sheet update: re-POST the original payload
+    // with `bsc_competitor` flipped to "yes" so the sign-in Sheet row
+    // reflects reality now that the attendee has committed to the BSC
+    // flow. Zapier's Sheet action is insert-only, so this intentionally
+    // produces a second row that correlates with the first by email and
+    // the shared `signed_in_at` timestamp — the dedupe is a post-event
+    // operational task on the Sheet, not an in-app feature. See
+    // requirement 14.6.7 and design section 17 → "Retroactive sign-in
+    // update" for the full trade-off.
+    //
+    // The call is deliberately fire-and-forget: we do NOT `await` it
+    // before closing the dialog or navigating. Any delay here would be
+    // a visible UI stall between the user's click and the BSC view
+    // appearing, which the requirement explicitly rules out. A 5-second
+    // timeout guards against a hung Zapier endpoint leaking a
+    // long-lived in-flight fetch (and surfaces as a debug-log entry
+    // either way). Only `bsc_competitor` is overridden — the original
+    // `signed_in_at` and every other field pass through unchanged.
+    if (webhookUrl && originalPayload && typeof originalPayload === "object") {
+      const retroPayload = { ...originalPayload, bsc_competitor: "yes" };
+      const retroRace = Promise.race([
+        postFormEncoded(webhookUrl, retroPayload),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`retroactive BSC update timed out after ${BSC_RETROACTIVE_POST_TIMEOUT_MS}ms`)),
+            BSC_RETROACTIVE_POST_TIMEOUT_MS,
+          ),
+        ),
+      ]);
+      retroRace
+        .then(() => {
+          pushDebugLog("signin", "retroactive bsc_competitor=yes sent", {
+            email: originalPayload.email,
+          });
+        })
+        .catch((err) => {
+          console.warn("[signin] retroactive BSC update failed:", err);
+          pushDebugLog("signin", "retroactive bsc_competitor=yes FAILED", {
+            err: String(err && err.message || err),
+          });
+        });
+    }
+
     try { localStorage.removeItem(BSC_PROMPT_SUPPRESS_KEY); } catch (_err) { /* no-op */ }
     close();
     router.navigate("/bsc");

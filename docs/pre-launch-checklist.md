@@ -810,6 +810,16 @@ on event morning.
        submission, then sign in again as the same person. The prompt
        re-opens exactly once. _(Req 14.6.1, 14.6.3, 14.6.4)_
 
+- [ ] 10a. **Pre-reg prompt retroactively updates sign-in sheet.** Sign
+       in on a device with an email that exists in the uploaded roster,
+       WITHOUT checking the BSC box. Confirm the sign-in sheet gets a
+       row with `BSC Competitor = no`. Accept the pre-reg prompt
+       ("Yes, take me there"). Within 15 seconds, a SECOND row appears
+       in the sign-in sheet with the same name/email and `BSC
+       Competitor = yes`. The attendee lands on `#/bsc` immediately
+       regardless of the second POST's outcome. Both test rows should
+       be deleted after verification. _(Req 14.6.7)_
+
 - [ ] 11. **Waiver text set to legal-reviewed copy (manual).** Confirm
        with chapter counsel that the current `bscWaiverText` is the
        approved copy for the 2027 competition. Record counsel's sign-
@@ -858,6 +868,7 @@ on event morning.
 | 8 | | | | row id = |
 | 9 | | | | row id = |
 | 10 | | | | |
+| 10a | | | | first row id = , second row id = |
 | 11 | | | | counsel = |
 | 12 | | | | duplicates found = |
 | 13 | | | | peak dashboard row count = |

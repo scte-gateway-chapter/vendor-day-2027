@@ -642,6 +642,26 @@ accepted them with HTTP 200. If `curl` samples don't appear, fire the
 test from the real app URL in a browser and the sample will show up
 reliably within a few seconds.
 
+### Why some attendees show up twice in the sign-in Sheet
+
+Attendees who signed in without checking the BSC box, were pre-registered
+for the Broadband Skills Challenge, and clicked "Yes" on the resulting
+prompt will appear in the sign-in Sheet as **two rows**:
+
+- First row: `bsc_competitor = no` (what they submitted)
+- Second row: `bsc_competitor = yes` (fired automatically when they accepted the prompt)
+
+Both rows share the same `signed_in_at` timestamp and the same email.
+Keep the `yes` row and discard the `no` row during post-event cleanup;
+the authoritative BSC check-in record lives in the BSC Sheet regardless.
+
+This is working as designed. The app does not try to update the first
+row — Zapier's "Create Spreadsheet Row" action is insert-only, and
+building an update-by-key path would mean a second Zap and a Sheet
+lookup on every submit. For a one-day event the duplicate row is the
+cheaper trade-off; the two rows correlate by the shared `signed_in_at`
+timestamp so a manual dedupe is a sort-and-eyeball on the Sheet.
+
 ### Attendees who sign in and the Attendee Directory
 
 The Sign-In form and the Attendee Directory are two independent
