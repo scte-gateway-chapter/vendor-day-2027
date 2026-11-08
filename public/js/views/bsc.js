@@ -172,7 +172,7 @@ export async function renderBsc(host) {
     }
   } catch (_err) { /* no-op */ }
   if (!webhookUrl) {
-    console.warn("[bsc] bscWebhookUrl missing from /api/config \u2014 set ZAPIER_BSC_WEBHOOK_URL in Cloudflare Pages env vars");
+    console.warn("[bsc] bscWebhookUrl missing from /api/config \u2014 set the BSC webhook URL in Cloudflare Pages env vars (see docs/admin-runbook.md)");
     renderNotConfigured(body);
     return;
   }
