@@ -249,6 +249,11 @@ export async function onRequest(context) {
   let imported = 0;
   let skipped = 0;
   const errors = [];
+  // Distinct lowercased emails that successfully wrote. The within-CSV
+  // duplicate count surfaced in the admin UI is `imported - uniqueEmails.size`
+  // — two rows with the same email each PATCH the same `bscPreReg/{email}`
+  // doc, so `imported` counts both while `uniqueEmails` counts one.
+  const uniqueEmails = new Set();
   const importedAt = new Date().toISOString();
 
   for (let i = 0; i < rows.length; i++) {
@@ -287,6 +292,7 @@ export async function onRequest(context) {
         body: firestorePayloadFromObject(payloadObject),
       });
       imported++;
+      uniqueEmails.add(email);
     } catch (err) {
       skipped++;
       const status = err?.status ? err.status : "unknown";
@@ -328,5 +334,10 @@ export async function onRequest(context) {
     }
   }
 
-  return jsonResponse({ imported, skipped, errors }, 200, cors);
+  // `rosterCount` is the post-upload total; `uniqueEmails` lets the
+  // client compute within-CSV duplicates without a second call. Both
+  // may be omitted if the count refresh failed above (best-effort).
+  const response = { imported, skipped, errors, uniqueEmails: uniqueEmails.size };
+  if (rosterCount !== null) response.rosterCount = rosterCount;
+  return jsonResponse(response, 200, cors);
 }

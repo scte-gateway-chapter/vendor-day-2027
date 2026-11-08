@@ -3514,6 +3514,10 @@ body.admin-modal-open {
   border-radius: 50%;
   animation: admin-bsc-spin 0.8s linear infinite;
 }
+/* The spinner's `display: inline-block` above wins over the HTML
+ * `[hidden]` default, so the element stays visible even when
+ * `spinner.hidden = true` in the handler. Restore the default. */
+.admin-bsc-upload-card__spinner[hidden] { display: none; }
 @keyframes admin-bsc-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   .admin-bsc-upload-card__spinner { animation: none; }
@@ -3539,6 +3543,71 @@ body.admin-modal-open {
 }
 .admin-bsc-upload-card__banner {
   margin: 0;
+}
+
+.admin-bsc-upload-card__view-btn {
+  margin-left: auto;
+}
+
+/* ---------- BSC roster view panel (inline, below the upload card
+ *            action row — see settings-editor.js buildRosterPanel) ---- */
+
+.admin-bsc-roster-panel {
+  display: block;
+  margin-top: var(--space-sm);
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface-alt);
+}
+.admin-bsc-roster-panel__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-xs);
+}
+.admin-bsc-roster-panel__title {
+  margin: 0;
+  font-size: var(--font-size-md);
+  color: var(--body-text);
+}
+.admin-bsc-roster-panel__state {
+  margin: var(--space-xs) 0;
+  color: var(--secondary-text);
+  font-size: var(--font-size-sm);
+}
+.admin-bsc-roster-panel__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin: 0;
+}
+.admin-bsc-roster-panel__table-wrap {
+  max-height: 24rem;
+  overflow: auto;
+  border: 1px solid var(--border-neutral);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.admin-bsc-roster-panel__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--font-size-sm);
+}
+.admin-bsc-roster-panel__table th,
+.admin-bsc-roster-panel__table td {
+  padding: var(--space-xs) var(--space-sm);
+  text-align: left;
+  border-bottom: 1px solid var(--border-neutral);
+}
+.admin-bsc-roster-panel__table thead th {
+  position: sticky;
+  top: 0;
+  background: var(--surface);
+  color: var(--body-text);
+  font-weight: 600;
+  z-index: 1;
 }
 
 .admin-bsc-settings-section__status {

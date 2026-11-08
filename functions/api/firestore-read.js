@@ -25,6 +25,13 @@ const ALLOWED_COLLECTIONS = new Set([
   "recap",
   "appSettings",
   "bscCheckins",
+  // `bscPreReg` is admin-list-only on the client side (the public
+  // Firestore rule allows `get:true / list:false` so attendees can
+  // read their own row by id but cannot enumerate the roster). The
+  // admin broker uses the service account and bypasses rules, so
+  // listing through this endpoint is the sanctioned path for the
+  // Settings page's "View roster" panel.
+  "bscPreReg",
 ]);
 const DOC_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 const DEFAULT_LIMIT = 500;

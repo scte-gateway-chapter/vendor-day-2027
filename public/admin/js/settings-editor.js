@@ -25,7 +25,7 @@
 
 import { initFirestore, getDoc, onSnapshot } from "/js/firebase.js";
 import * as ui from "/js/ui.js";
-import { adminFetch } from "./admin-fetch.js";
+import { adminFetch, adminReadCollection } from "./admin-fetch.js";
 import { registerAdminViewCleanup } from "./admin.js";
 import { formatLastEditedPhrase } from "./collision-check.js";
 import { relativeTime } from "/js/utils/time.js";
@@ -596,6 +596,7 @@ export default async function renderSettingsEditor(host) {
     uploadBtn.className = "btn-primary admin-bsc-upload-card__btn";
     uploadBtn.textContent = "Upload BSC roster (CSV)";
     uploadBtn.disabled = !online;
+    uploadBtn.setAttribute("aria-busy", "false");
 
     const fileInput = document.createElement("input");
     fileInput.type = "file";
@@ -609,7 +610,14 @@ export default async function renderSettingsEditor(host) {
     spinner.setAttribute("aria-hidden", "true");
     spinner.hidden = true;
 
-    actionsRow.append(uploadBtn, fileInput, spinner);
+    const viewRosterBtn = document.createElement("button");
+    viewRosterBtn.type = "button";
+    viewRosterBtn.className = "btn-secondary admin-bsc-upload-card__view-btn";
+    viewRosterBtn.textContent = "View roster";
+    viewRosterBtn.setAttribute("aria-expanded", "false");
+    viewRosterBtn.setAttribute("aria-controls", "admin-bsc-roster-panel");
+
+    actionsRow.append(uploadBtn, fileInput, spinner, viewRosterBtn);
     card.appendChild(actionsRow);
 
     const resultLine = document.createElement("p");
@@ -617,6 +625,10 @@ export default async function renderSettingsEditor(host) {
     resultLine.setAttribute("aria-live", "polite");
     resultLine.hidden = true;
     card.appendChild(resultLine);
+    // Track visibility so the standalone status line can drop the
+    // redundant "N competitors in roster" phrase while this line is
+    // showing a fresh post-upload summary that already carries the count.
+    card._resultLineVisible = () => !resultLine.hidden;
 
     const errorPanel = document.createElement("details");
     errorPanel.className = "admin-bsc-upload-card__errors";
@@ -634,16 +646,39 @@ export default async function renderSettingsEditor(host) {
     banner.hidden = true;
     card.appendChild(banner);
 
+    // Inline "View roster" panel. Lives inside the upload card so it is
+    // visually anchored to the roster action group. Not a modal: no
+    // focus trap or Esc handling is needed because the panel can live
+    // alongside the rest of the settings page without stealing focus.
+    const rosterPanel = buildRosterPanel(viewRosterBtn);
+    card.appendChild(rosterPanel.el);
+
     uploadBtn.addEventListener("click", () => {
       if (uploadBtn.disabled) return;
       fileInput.click();
     });
 
+    viewRosterBtn.addEventListener("click", () => {
+      rosterPanel.toggle();
+    });
+
     fileInput.addEventListener("change", async () => {
       const file = fileInput.files && fileInput.files[0];
       // Reset the input so re-choosing the same file still fires change.
+      // The reset happens BEFORE the "no file" early return so the
+      // handler stays idempotent if the user cancels the file picker
+      // (change fires with files=[] on some browsers and never fires on
+      // others; the explicit reset keeps the next pick clean either way).
       fileInput.value = "";
-      if (!file) return;
+      if (!file) {
+        // Belt-and-suspenders — cancel path never showed the spinner
+        // in the first place, but clear state anyway so a stray style
+        // or future refactor can't leave the admin staring at a spinner.
+        spinner.hidden = true;
+        uploadBtn.disabled = !online;
+        uploadBtn.setAttribute("aria-busy", "false");
+        return;
+      }
       banner.hidden = true;
       banner.textContent = "";
       resultLine.hidden = true;
@@ -652,6 +687,7 @@ export default async function renderSettingsEditor(host) {
       errorList.innerHTML = "";
 
       uploadBtn.disabled = true;
+      uploadBtn.setAttribute("aria-busy", "true");
       spinner.hidden = false;
       try {
         const form = new FormData();
@@ -665,8 +701,30 @@ export default async function renderSettingsEditor(host) {
         const imported = Number.isFinite(response?.imported) ? response.imported : 0;
         const skipped = Number.isFinite(response?.skipped) ? response.skipped : 0;
         const errors = Array.isArray(response?.errors) ? response.errors : [];
-        resultLine.textContent =
-          `Imported ${imported} competitor${imported === 1 ? "" : "s"}. ${skipped} skipped.`;
+        const uniqueEmails = Number.isFinite(response?.uniqueEmails)
+          ? response.uniqueEmails
+          : imported;
+        const rosterCount = Number.isFinite(response?.rosterCount)
+          ? response.rosterCount
+          : null;
+        const totalRows = imported + skipped;
+        const duplicatesMerged = Math.max(0, imported - uniqueEmails);
+
+        // Build a single reconciled message so the admin does not see
+        // conflicting numbers. "N rows in CSV" is the raw file size,
+        // "N competitors in roster" is the final Firestore count,
+        // "N duplicate rows merged" explains the gap between them.
+        let text = `Processed ${totalRows} row${totalRows === 1 ? "" : "s"}`;
+        if (rosterCount !== null) {
+          text +=
+            ` \u2192 ${rosterCount} competitor${rosterCount === 1 ? "" : "s"} in roster`;
+        }
+        if (duplicatesMerged > 0) {
+          text +=
+            ` (${duplicatesMerged} duplicate row${duplicatesMerged === 1 ? "" : "s"} merged by email)`;
+        }
+        text += `. ${skipped} skipped.`;
+        resultLine.textContent = text;
         resultLine.hidden = false;
         if (errors.length > 0) {
           for (const msg of errors) {
@@ -677,6 +735,9 @@ export default async function renderSettingsEditor(host) {
           errorPanel.hidden = false;
         }
         ui.toast("success", "Roster upload complete.");
+        // Refresh the "View roster" panel if it is currently open so
+        // the admin can confirm their upload landed without re-opening.
+        if (rosterPanel.isOpen()) rosterPanel.refresh();
         nudgeRefresh();
       } catch (err) {
         console.warn("[admin-settings] bsc roster upload failed:", err);
@@ -687,10 +748,192 @@ export default async function renderSettingsEditor(host) {
       } finally {
         spinner.hidden = true;
         uploadBtn.disabled = !online;
+        uploadBtn.setAttribute("aria-busy", "false");
+        // Status line's redundancy depends on resultLine visibility.
+        if (rosterStatusEl) renderRosterStatus(rosterStatusEl);
       }
     });
 
     return card;
+  }
+
+  /* ---------------- BSC roster view panel ---------------- */
+
+  /**
+   * Collapsible read-only roster panel. Fetches `bscPreReg` via the
+   * admin `/api/firestore-read` broker on first open and on explicit
+   * refresh; the data lives in a closure so a close + reopen without
+   * an upload in between does not re-fetch.
+   * @param {HTMLButtonElement} toggleBtn  button whose aria-expanded we drive.
+   * @returns {{ el: HTMLElement, toggle: () => void, isOpen: () => boolean, refresh: () => Promise<void> }}
+   */
+  function buildRosterPanel(toggleBtn) {
+    const el = document.createElement("div");
+    el.className = "admin-bsc-roster-panel";
+    el.id = "admin-bsc-roster-panel";
+    el.hidden = true;
+    el.setAttribute("role", "region");
+    el.setAttribute("aria-label", "Current BSC pre-registration roster");
+
+    const header = document.createElement("div");
+    header.className = "admin-bsc-roster-panel__header";
+    const title = document.createElement("h4");
+    title.className = "admin-bsc-roster-panel__title";
+    title.textContent = "Current BSC pre-registration roster";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "btn-secondary admin-bsc-roster-panel__close";
+    closeBtn.textContent = "Close";
+    header.append(title, closeBtn);
+    el.appendChild(header);
+
+    const body = document.createElement("div");
+    body.className = "admin-bsc-roster-panel__body";
+    body.setAttribute("aria-live", "polite");
+    el.appendChild(body);
+
+    /** @type {object[] | null} */
+    let rosterRows = null;
+    let loading = false;
+    /** @type {Error | null} */
+    let loadErr = null;
+
+    function setOpen(open) {
+      el.hidden = !open;
+      toggleBtn.setAttribute("aria-expanded", open ? "true" : "false");
+      toggleBtn.textContent = open ? "Hide roster" : "View roster";
+    }
+
+    function render() {
+      body.innerHTML = "";
+      if (loading) {
+        const p = document.createElement("p");
+        p.className = "admin-bsc-roster-panel__state";
+        p.textContent = "Loading roster\u2026";
+        body.appendChild(p);
+        return;
+      }
+      if (loadErr) {
+        const wrap = document.createElement("div");
+        wrap.className = "status-error admin-bsc-roster-panel__error";
+        wrap.setAttribute("role", "alert");
+        const msg = document.createElement("span");
+        msg.textContent = "Couldn't load the roster. ";
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.className = "btn-secondary admin-bsc-roster-panel__retry";
+        retry.textContent = "Retry";
+        retry.addEventListener("click", () => { void load(); });
+        wrap.append(msg, retry);
+        body.appendChild(wrap);
+        return;
+      }
+      const rows = Array.isArray(rosterRows) ? rosterRows : [];
+      // Update the title with the live count.
+      title.textContent =
+        `Current BSC pre-registration roster (${rows.length} competitor${rows.length === 1 ? "" : "s"})`;
+      if (rows.length === 0) {
+        const p = document.createElement("p");
+        p.className = "admin-bsc-roster-panel__state";
+        p.textContent = "No competitors imported yet. Upload a CSV above.";
+        body.appendChild(p);
+        return;
+      }
+      const sorted = rows.slice().sort((a, b) =>
+        String(a.attendee_name || "").localeCompare(
+          String(b.attendee_name || ""),
+          undefined,
+          { sensitivity: "base" },
+        ),
+      );
+      const tableWrap = document.createElement("div");
+      tableWrap.className = "admin-bsc-roster-panel__table-wrap";
+      const table = document.createElement("table");
+      table.className = "admin-bsc-roster-panel__table";
+      const thead = document.createElement("thead");
+      const headRow = document.createElement("tr");
+      const COLUMNS = [
+        "Competitor name",
+        "Email",
+        "Company",
+        "Office location",
+        "Supervisor name",
+        "Reference ID",
+      ];
+      for (const label of COLUMNS) {
+        const th = document.createElement("th");
+        th.scope = "col";
+        th.textContent = label;
+        headRow.appendChild(th);
+      }
+      thead.appendChild(headRow);
+      table.appendChild(thead);
+      const tbody = document.createElement("tbody");
+      for (const row of sorted) {
+        const tr = document.createElement("tr");
+        appendRosterCell(tr, row.attendee_name);
+        appendRosterCell(tr, row.email);
+        appendRosterCell(tr, row.company);
+        appendRosterCell(tr, row.office_location);
+        appendRosterCell(tr, row.supervisor_name);
+        appendRosterCell(tr, row.reference_id);
+        tbody.appendChild(tr);
+      }
+      table.appendChild(tbody);
+      tableWrap.appendChild(table);
+      body.appendChild(tableWrap);
+    }
+
+    async function load() {
+      loading = true;
+      loadErr = null;
+      render();
+      try {
+        // 500 rows comfortably covers the event; see docs/admin-runbook.md
+        // under "Viewing the roster" for the documented ceiling.
+        const list = await adminReadCollection("bscPreReg", { limit: 500 });
+        rosterRows = Array.isArray(list) ? list : [];
+      } catch (err) {
+        if (err?.code === "session-expired") return;
+        console.warn("[admin-settings] roster view fetch failed:", err);
+        loadErr = err;
+        rosterRows = null;
+      } finally {
+        loading = false;
+        render();
+      }
+    }
+
+    closeBtn.addEventListener("click", () => {
+      setOpen(false);
+      toggleBtn.focus();
+    });
+
+    function toggle() {
+      const nowOpen = el.hidden; // currently hidden means we are opening
+      setOpen(nowOpen);
+      if (nowOpen && rosterRows === null && !loading) {
+        void load();
+      } else if (nowOpen) {
+        render();
+      }
+    }
+
+    async function refresh() {
+      await load();
+    }
+
+    function isOpen() {
+      return !el.hidden;
+    }
+
+    return { el, toggle, isOpen, refresh };
+  }
+
+  function appendRosterCell(tr, value) {
+    const td = document.createElement("td");
+    td.textContent = typeof value === "string" ? value : "";
+    tr.appendChild(td);
   }
 
   /* ---------------- BSC roster status line ---------------- */
@@ -715,8 +958,18 @@ export default async function renderSettingsEditor(host) {
       return;
     }
     const when = relativeTime(lastAt) || "just now";
-    el.textContent =
-      `${count} competitor${count === 1 ? "" : "s"} in roster \u00B7 Last imported ${when}`;
+    // Drop the "N competitors in roster" phrase when the upload result
+    // line above is showing a fresh summary that already carries that
+    // count. The admin reads one coherent number, not two conflicting
+    // ones. On page load (no recent upload), fall back to the full line.
+    const uploadCard = panel.querySelector(".admin-bsc-upload-card");
+    const resultVisible =
+      uploadCard && typeof uploadCard._resultLineVisible === "function"
+        ? uploadCard._resultLineVisible()
+        : false;
+    el.textContent = resultVisible
+      ? `Last imported ${when}`
+      : `${count} competitor${count === 1 ? "" : "s"} in roster \u00B7 Last imported ${when}`;
     try { el.title = String(lastAt); } catch (_err) { /* ignore */ }
   }
 

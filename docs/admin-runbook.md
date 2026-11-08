@@ -717,11 +717,14 @@ section, click "Upload BSC roster (CSV)". The native file picker
 opens filtered to `.csv`. On submit the file is POSTed to
 `/api/bsc-roster-upload` via the admin JWT, parsed server-side, and
 upserted into `bscPreReg` keyed by lowercased email. The response
-renders inline below the upload button as "Imported N competitors.
-M skipped." plus a `<details>` block listing any per-row errors.
-Rows with missing name or email are reported with their row number
-and counted into `skipped`; the import continues through the rest of
-the file.
+renders inline below the upload button as "Processed N rows → M
+competitors in roster (K duplicate rows merged by email). L skipped."
+plus a `<details>` block listing any per-row errors. The reconciled
+wording explains the gap between CSV row count and final roster
+count: multiple rows with the same email collapse into one roster
+entry (`K duplicate rows merged`), rows with missing name or email
+are reported with their row number and counted into `L skipped`; the
+import continues through the rest of the file.
 
 **Re-upload is an upsert.** A second upload with the same emails
 updates the existing rows in place rather than replacing the whole
@@ -736,11 +739,37 @@ After a successful upload the status line below the button updates
 to "N competitors in roster · Last imported <relative time>" — this
 reads back from `bscRosterCount` and `bscRosterLastImportedAt` on
 `appSettings/singleton`, which the Function maintains by counting
-`bscPreReg` pages after each upload. If the count refresh fails
-(network blip, 5xx) the import itself still succeeded; the status
-line will show the stale count until a subsequent upload refreshes
-it. The errors block will note "Count refresh failed" so you know to
-re-run.
+`bscPreReg` pages after each upload. While the just-completed upload
+summary is still visible above, the status line condenses to just
+"Last imported <relative time>" so the roster count is not shown
+twice. If the count refresh fails (network blip, 5xx) the import
+itself still succeeded; the status line will show the stale count
+until a subsequent upload refreshes it. The errors block will note
+"Count refresh failed" so you know to re-run.
+
+### Viewing the current roster
+
+The admin Settings page's BSC section includes a **View roster**
+button next to the upload button. Click it to expand a read-only
+panel listing every pre-registered competitor currently in Firestore,
+sorted by Competitor name ASC. Columns: Competitor name, Email,
+Company, Office location, Supervisor name, Reference ID. Job role,
+supervisor email/phone, and SCTE member ID are intentionally omitted
+from this view to keep the table skimmable — they are still accessible
+via the Firestore console if needed.
+
+Use this panel to confirm a CSV upload landed with the expected data,
+or to spot-check that a competitor's row has the fields the sign-in
+flow will match against. The panel refreshes automatically after each
+successful upload if it is already open. The panel is read-only: edit
+or delete the roster by re-exporting the Google Sheet and re-uploading
+the CSV.
+
+**Current ceiling: 500 entries.** The underlying call reads up to 500
+`bscPreReg` docs. The 2026 roster was 41 unique competitors; 2027 is
+budgeted at roughly the same size. If the chapter ever grows the event
+past 500 competitors, add pagination (or raise the limit server-side)
+before re-opening the panel on a bigger roster.
 
 ### Flipping waiver mode
 
