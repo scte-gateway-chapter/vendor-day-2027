@@ -39,11 +39,26 @@ import { adminFetch, adminReadCollection } from "./admin-fetch.js";
 import { registerAdminViewCleanup } from "./admin.js";
 import { formatLastEditedPhrase } from "./collision-check.js";
 import { parseCsv, trimRow } from "./csv-parse.js";
+import { toCsv, downloadCsv, buildCsvFilename } from "/js/utils/csv-export.js";
+import { pushDebugLog } from "/js/debug-log.js";
 
 const NAME_MAX = 120;
 const COMPANY_MAX = 120;
 const TITLE_MAX = 120;
 const OFFLINE_TOOLTIP = "You're offline \u2014 admin changes require connectivity.";
+
+/**
+ * Canonical column list for the Attendees directory CSV export.
+ */
+export const ATTENDEES_COLUMNS = [
+  { key: "name",       label: "Name" },
+  { key: "company",    label: "Company" },
+  { key: "title",      label: "Title" },
+  { key: "optedOut",   label: "Opted out" },
+  { key: "importedAt", label: "Imported at" },
+  { key: "updatedBy",  label: "Updated by" },
+  { key: "updatedAt",  label: "Updated at" },
+];
 
 // Expected column header labels, lowercased for case-insensitive matching.
 const EXPECTED = {
@@ -108,6 +123,38 @@ export default async function renderAttendeesImporter(host) {
   /** @type {{ close: () => void } | null} */
   let activeOverlay = null;
 
+  async function exportDirectoryCsv() {
+    try {
+      // ALWAYS fresh fetch — do NOT read the in-memory `currentDirectory`
+      // cache (per brief decision 9 + design iteration-3 finding #3).
+      // An admin who just ran a merge-commit and immediately exports
+      // must get the post-commit snapshot; a 30-60s staleness window
+      // would silently strip rows they just imported.
+      const list = await adminReadCollection("attendees", { limit: 1000 });
+      const data = (Array.isArray(list) ? list : []).slice().sort((a, b) =>
+        String(a?.name || "").localeCompare(
+          String(b?.name || ""),
+          undefined,
+          { sensitivity: "base" },
+        ),
+      );
+      const csv = toCsv(data, ATTENDEES_COLUMNS);
+      const filename = buildCsvFilename("attendees");
+      await downloadCsv(filename, csv);
+      ui.toast("success", `Exported ${data.length} row${data.length === 1 ? "" : "s"} to ${filename}.`);
+      // NOTE (deferred from Phase 1, review iteration 3 NIT #2): pushDebugLog
+      // writes to the shared debug-log ring buffer, but admin.js does not
+      // currently mount the debug overlay. The toast above is the admin-
+      // visible receipt; this log line is here so a future patch that mounts
+      // the overlay in admin surfaces this event retroactively in that session.
+      pushDebugLog("csv-export", "attendees", { count: data.length, filename });
+    } catch (err) {
+      if (err?.code === "session-expired") return;
+      console.warn("[admin-attendees] CSV export failed:", err);
+      ui.toast("error", "Couldn't build the CSV. Try again.");
+    }
+  }
+
   async function refreshDirectory() {
     try {
       // Unfiltered read — the importer needs opted-out rows too for the
@@ -165,6 +212,18 @@ export default async function renderAttendeesImporter(host) {
 
   function renderUploadCard() {
     uploadSection.innerHTML = "";
+
+    const exportRow = document.createElement("div");
+    exportRow.className = "admin-attendees-importer__export-row";
+    const exportBtn = document.createElement("button");
+    exportBtn.type = "button";
+    exportBtn.className = "btn-secondary";
+    exportBtn.textContent = "Export current directory as CSV";
+    exportBtn.addEventListener("click", () => {
+      void exportDirectoryCsv();
+    });
+    exportRow.appendChild(exportBtn);
+    uploadSection.appendChild(exportRow);
 
     const dropzone = document.createElement("div");
     dropzone.className = "admin-upload-dropzone";

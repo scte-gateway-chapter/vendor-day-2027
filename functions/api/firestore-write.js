@@ -22,6 +22,15 @@ const ALLOWED_COLLECTIONS = new Set([
   "feedbackConfig",
   "recap",
   "appSettings",
+  "signIns", // FEAT-TBD: enables admin "mark as duplicate" / typo-fix once a UI lands; Phase 1 does not call it.
+             // Audit-trail trade-off (review iteration 3 NIT #4, deferred): /api/firestore-write
+             // server-stamps `updatedAt` + `updatedBy` on every PATCH. If a future admin edits a
+             // signIns row through this broker, that stamp will OVERWRITE the `updatedAt` written
+             // by /api/signin-mark-bsc (the retroactive BSC-yes marker). The admin dashboard sorts
+             // on `createdAt` and the "N sign-ins today" count uses `createdAt`, so this is a mild
+             // audit-trail collision rather than a correctness issue. When the admin edit UI lands
+             // (future phase), prefer a dedicated endpoint that preserves the retroactive marker
+             // (e.g. write to a `editedAt` field instead of `updatedAt`).
 ]);
 const DOC_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 const ALLOWED_OPS = new Set(["set", "update", "delete"]);

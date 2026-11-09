@@ -3806,3 +3806,27 @@ body.admin-modal-open {
   color: var(--brand-green-text);
   border-color: var(--success-border);
 }
+
+/* ---------- CSV export affordances (Phase 1) ---------- */
+
+/* Sits above the Attendees importer dropzone so the "Export current
+ * directory as CSV" button reads as a distinct section from the
+ * import flow. */
+.admin-attendees-importer__export-row {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: var(--space-sm);
+}
+
+/* "Download roster CSV" button in the roster-upload card. Reads as a
+ * sibling of the existing "View roster" button. */
+.admin-settings-upload-card__export-btn {
+  margin-left: var(--space-xs);
+}
+
+/* Give the sticky dashboard header a small gap so the new "Download
+ * CSV" button is spaced from the title at narrow widths (the
+ * `justify-content: space-between` above handles wide widths). */
+.admin-bsc-dashboard__header-row {
+  gap: var(--space-sm);
+}

@@ -26,6 +26,7 @@ import renderFeedbackEditor from "./feedback-editor.js";
 import renderRecapEditor from "./recap-editor.js";
 import renderSettingsEditor from "./settings-editor.js";
 import renderBscCheckinsEditor from "./bsc-checkins.js";
+import renderSignInsDashboard from "./signins-dashboard.js";
 
 const UNAUTH_CLASS = "admin-shell--unauthenticated";
 
@@ -46,6 +47,7 @@ const PROTECTED_ROUTES = [
   { slug: "recap", label: "Admin Recap", taskLabel: "Task 24" }, // replaced by renderRecapEditor below
   { slug: "settings", label: "Admin Settings", taskLabel: "Attendee Sign-In toggle" }, // replaced by renderSettingsEditor below
   { slug: "bsc-checkins", label: "Admin BSC Check-Ins", taskLabel: "BSC check-in" }, // replaced by renderBscCheckinsEditor below
+  { slug: "signins", label: "Admin Sign-Ins", taskLabel: "Phase 1 live sign-ins" }, // replaced by renderSignInsDashboard below
 ];
 
 /* ----------------- Per-view cleanup registry ----------------- */
@@ -308,6 +310,23 @@ function handleBscCheckinsRoute() {
   syncPhoneDropdown("bsc-checkins");
 }
 
+function handleSignInsRoute() {
+  if (!isAdminAuthenticated()) {
+    router.navigate("/");
+    return;
+  }
+  setAuthShell(true);
+  const host = viewHost();
+  if (host) {
+    renderSignInsDashboard(host)
+      .catch((err) => {
+        console.warn("[admin] signins dashboard render failed:", err);
+      })
+      .finally(() => injectAdminHeadingSoon());
+  }
+  syncPhoneDropdown("signins");
+}
+
 function handleProtectedRoute(slug, label, taskLabel) {
   if (!isAdminAuthenticated()) {
     // Fall back to the login screen. Replace rather than push so Back from
@@ -341,6 +360,7 @@ function registerRoutes() {
   router.register("#/recap", handleRecapRoute);
   router.register("#/settings", handleSettingsRoute);
   router.register("#/bsc-checkins", handleBscCheckinsRoute);
+  router.register("#/signins", handleSignInsRoute);
   for (const route of PROTECTED_ROUTES) {
     if (
       route.slug === "dashboard" ||
@@ -352,7 +372,8 @@ function registerRoutes() {
       route.slug === "feedback" ||
       route.slug === "recap" ||
       route.slug === "settings" ||
-      route.slug === "bsc-checkins"
+      route.slug === "bsc-checkins" ||
+      route.slug === "signins"
     ) continue;
     router.register(`#/${route.slug}`, () =>
       handleProtectedRoute(route.slug, route.label, route.taskLabel),

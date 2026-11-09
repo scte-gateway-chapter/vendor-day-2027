@@ -96,6 +96,19 @@ service cloud.firestore {
       allow read, update, delete: if false;
     }
 
+    // Attendee sign-in records (Phase 1 of the migration FROM Google
+    // Sheets as primary store TO Firestore). Attendee clients create
+    // one document per app submit; nobody reads, lists, updates, or
+    // deletes directly. The admin Sign-Ins dashboard reads
+    // server-side via `/api/firestore-read` (service account). The
+    // retroactive BSC-yes update after the pre-reg prompt flows
+    // through `/api/signin-mark-bsc` (service account), NOT a direct
+    // client update, so `update: false` here is correct.
+    match /signIns/{signInId} {
+      allow create: if true;
+      allow read, list, update, delete: if false;
+    }
+
     // Default-deny everything else.
     match /{document=**} {
       allow read, write: if false;

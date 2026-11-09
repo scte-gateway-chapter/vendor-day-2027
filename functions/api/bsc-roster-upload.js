@@ -27,6 +27,7 @@ import { extractBearer, verifyAdminJwt } from "../_shared/_jwt.js";
 import {
   firestoreRequest,
   firestorePayloadFromObject,
+  firestoreCountCollection,
 } from "../_shared/_google-auth.js";
 import { parseCsv, normalizeHeader } from "../_shared/_csv.js";
 
@@ -97,36 +98,6 @@ function looksLikeCsv(file) {
   const type = (file?.type || "").toLowerCase();
   if (!type) return false;
   return ALLOWED_CONTENT_TYPES.has(type);
-}
-
-/**
- * Count every document in a collection by paging the Firestore REST
- * `GET documents/{collection}?pageSize=1000` endpoint until the server
- * stops returning a `nextPageToken`. We deliberately do NOT use the
- * `:runAggregationQuery` custom method because the shared
- * `firestoreRequest` helper always builds its URL as `${base}/${path}`,
- * which inserts a stray slash before the colon and 404s the aggregation
- * call. See design "Post-import bookkeeping" → Option C.
- */
-async function countCollection(env, collectionId) {
-  let total = 0;
-  let pageToken = null;
-  do {
-    const query = { pageSize: "1000" };
-    if (pageToken) query.pageToken = pageToken;
-    const result = await firestoreRequest(env, {
-      method: "GET",
-      path: collectionId,
-      query,
-    });
-    const page = Array.isArray(result?.documents) ? result.documents : [];
-    total += page.length;
-    pageToken =
-      typeof result?.nextPageToken === "string" && result.nextPageToken
-        ? result.nextPageToken
-        : null;
-  } while (pageToken);
-  return total;
 }
 
 export async function onRequest(context) {
@@ -306,7 +277,7 @@ export async function onRequest(context) {
   // import outcome is reported honestly to the admin UI.
   let rosterCount = null;
   try {
-    rosterCount = await countCollection(env, "bscPreReg");
+    rosterCount = await firestoreCountCollection(env, "bscPreReg");
   } catch (err) {
     console.warn("[bsc-roster-upload] count refresh failed:", err);
     errors.push(`Count refresh failed: ${err?.message || "unknown error"}`);

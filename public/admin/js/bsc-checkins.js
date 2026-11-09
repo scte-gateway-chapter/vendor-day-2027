@@ -34,9 +34,58 @@ import { relativeTime } from "/js/utils/time.js";
 import { isBscEnabled } from "/js/app-settings.js";
 import { adminFetch, adminReadCollection } from "./admin-fetch.js";
 import { registerAdminViewCleanup } from "./admin.js";
+import { toCsv, downloadCsv, buildCsvFilename } from "/js/utils/csv-export.js";
+import { pushDebugLog } from "/js/debug-log.js";
 
 const POLL_INTERVAL_MS = 30_000;
 const SEARCH_DEBOUNCE_MS = 150;
+
+/**
+ * Canonical column list for the BSC Check-Ins view. Single source of
+ * truth for both the on-screen table (filtered to visible columns)
+ * and the CSV export (full list). Any field added here flows to both
+ * without a second edit.
+ */
+export const BSC_CHECKINS_COLUMNS = [
+  { key: "attendee_name",    label: "Name" },
+  { key: "email",            label: "Email" },
+  { key: "company",          label: "Company" },
+  { key: "office_location",  label: "Office location" },
+  { key: "job_role",         label: "Job role" },
+  { key: "supervisor_name",  label: "Supervisor name" },
+  { key: "supervisor_email", label: "Supervisor email" },
+  { key: "supervisor_phone", label: "Supervisor phone" },
+  { key: "scte_member_id",   label: "SCTE member #" },
+  { key: "reference_id",     label: "Reference ID" },
+  { key: "submitted_at",     label: "Submitted at" },
+  { key: "entry_type",       label: "Pre-reg status" },
+  { key: "manager_approved", label: "Manager approval" },
+  { key: "waiver_mode",      label: "Waiver mode" },
+  { key: "waiver_signature", label: "Signature name" },
+  { key: "waiver_signed_at", label: "Waiver signed at" },
+  { key: "createdAt",        label: "Check-in time" },
+];
+
+const BSC_CHECKINS_HEADER_KEYS = [
+  "attendee_name",
+  "email",
+  "company",
+  "office_location",
+  "entry_type",
+  "manager_approved",
+  "waiver_mode",
+  "waiver_signed_at",
+  "waiver_signature",
+  "createdAt",
+];
+
+// Fails loudly in local/preview if a future refactor forgets to update
+// the shared column constant when renaming a displayed field.
+for (const k of BSC_CHECKINS_HEADER_KEYS) {
+  if (!BSC_CHECKINS_COLUMNS.find((c) => c.key === k)) {
+    console.warn(`[bsc-checkins] column drift: '${k}' missing from BSC_CHECKINS_COLUMNS`);
+  }
+}
 
 /**
  * Render the admin BSC check-ins view into `host`.
@@ -51,7 +100,7 @@ export default async function renderBscCheckinsEditor(host) {
   container.setAttribute("aria-label", "Admin BSC Check-Ins");
   host.appendChild(container);
 
-  const header = buildStickyHeader();
+  const header = buildStickyHeader(() => downloadCurrent());
   container.appendChild(header.el);
 
   const offlineBanner = buildOfflineBanner();
@@ -371,17 +420,29 @@ export default async function renderBscCheckinsEditor(host) {
   function buildTableHead() {
     const thead = document.createElement("thead");
     const tr = document.createElement("tr");
+    // Column labels are derived from the shared BSC_CHECKINS_COLUMNS so
+    // the CSV header and the on-screen header stay in lockstep.
+    const labelByKey = Object.fromEntries(
+      BSC_CHECKINS_COLUMNS.map((c) => [c.key, c.label]),
+    );
+    const label = (key, fallback) => labelByKey[key] || fallback;
+    // Overrides for columns whose on-screen heading differs from the
+    // CSV-centric label (e.g. "Waiver signed" vs "Waiver signed at").
+    const DISPLAY_OVERRIDE = {
+      waiver_signed_at: "Waiver signed",
+    };
+    const text = (key, fallback) => DISPLAY_OVERRIDE[key] || label(key, fallback);
     const columns = [
-      { key: "name", label: "Name", sortable: true },
-      { key: null, label: "Email" },
-      { key: null, label: "Company" },
-      { key: null, label: "Office location" },
-      { key: null, label: "Pre-reg status" },
-      { key: null, label: "Manager approval" },
-      { key: null, label: "Waiver mode" },
-      { key: null, label: "Waiver signed" },
-      { key: null, label: "Signature name" },
-      { key: "createdAt", label: "Check-in time", sortable: true },
+      { key: "name", label: text("attendee_name", "Name"), sortable: true },
+      { key: null, label: text("email", "Email") },
+      { key: null, label: text("company", "Company") },
+      { key: null, label: text("office_location", "Office location") },
+      { key: null, label: text("entry_type", "Pre-reg status") },
+      { key: null, label: text("manager_approved", "Manager approval") },
+      { key: null, label: text("waiver_mode", "Waiver mode") },
+      { key: null, label: text("waiver_signed_at", "Waiver signed") },
+      { key: null, label: text("waiver_signature", "Signature name") },
+      { key: "createdAt", label: text("createdAt", "Check-in time"), sortable: true },
     ];
     for (const col of columns) {
       const th = document.createElement("th");
@@ -551,6 +612,29 @@ export default async function renderBscCheckinsEditor(host) {
     return copy;
   }
 
+  /* ---------------- CSV export ---------------- */
+
+  async function downloadCurrent() {
+    try {
+      const list = await adminReadCollection("bscCheckins", { limit: 1000 });
+      const data = Array.isArray(list) ? list : [];
+      const csv = toCsv(data, BSC_CHECKINS_COLUMNS);
+      const filename = buildCsvFilename("bscCheckins");
+      await downloadCsv(filename, csv);
+      ui.toast("success", `Exported ${data.length} row${data.length === 1 ? "" : "s"} to ${filename}.`);
+      // NOTE (deferred from Phase 1, review iteration 3 NIT #2): pushDebugLog
+      // writes to the shared debug-log ring buffer, but admin.js does not
+      // currently mount the debug overlay. The toast above is the admin-
+      // visible receipt; this log line is here so a future patch that mounts
+      // the overlay in admin surfaces this event retroactively in that session.
+      pushDebugLog("csv-export", "bscCheckins", { count: data.length, filename });
+    } catch (err) {
+      if (err?.code === "session-expired") return;
+      console.warn("[admin-bsc-checkins] CSV export failed:", err);
+      ui.toast("error", "Couldn't build the CSV. Try again.");
+    }
+  }
+
   /* ---------------- Fetch loop ---------------- */
 
   let pollTimer = null;
@@ -625,14 +709,23 @@ export default async function renderBscCheckinsEditor(host) {
  * Sticky secondary header
  * ================================================================= */
 
-function buildStickyHeader() {
+function buildStickyHeader(onDownload) {
   const el = document.createElement("header");
   el.className = "admin-bsc-dashboard__header";
-  el.innerHTML = `
-    <div class="admin-bsc-dashboard__header-row">
-      <h2 class="admin-bsc-dashboard__header-title">Admin \u2014 BSC Check-Ins</h2>
-    </div>
-  `;
+  const row = document.createElement("div");
+  row.className = "admin-bsc-dashboard__header-row";
+  const title = document.createElement("h2");
+  title.className = "admin-bsc-dashboard__header-title";
+  title.textContent = "Admin \u2014 BSC Check-Ins";
+  const downloadBtn = document.createElement("button");
+  downloadBtn.type = "button";
+  downloadBtn.className = "btn-secondary";
+  downloadBtn.textContent = "Download CSV";
+  downloadBtn.addEventListener("click", () => {
+    if (typeof onDownload === "function") onDownload();
+  });
+  row.append(title, downloadBtn);
+  el.appendChild(row);
   return { el };
 }
 

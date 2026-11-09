@@ -29,10 +29,31 @@ import { adminFetch, adminReadCollection } from "./admin-fetch.js";
 import { registerAdminViewCleanup } from "./admin.js";
 import { formatLastEditedPhrase } from "./collision-check.js";
 import { relativeTime } from "/js/utils/time.js";
+import { toCsv, downloadCsv, buildCsvFilename } from "/js/utils/csv-export.js";
+import { pushDebugLog } from "/js/debug-log.js";
 
 const POLL_INTERVAL_MS = 30_000;
 const OFFLINE_TOOLTIP = "You're offline \u2014 admin changes require connectivity.";
 const WAIVER_TEXT_MAX = 20000;
+
+/**
+ * Canonical column list for the BSC Pre-Reg roster CSV export. Keeps
+ * the CSV and any future on-screen roster rendering in lockstep.
+ */
+export const BSC_PREREG_COLUMNS = [
+  { key: "attendee_name",    label: "Competitor name" },
+  { key: "email",            label: "Email" },
+  { key: "company",          label: "Company" },
+  { key: "office_location",  label: "Office location" },
+  { key: "job_role",         label: "Job role" },
+  { key: "supervisor_name",  label: "Supervisor name" },
+  { key: "supervisor_email", label: "Supervisor email" },
+  { key: "supervisor_phone", label: "Supervisor phone" },
+  { key: "scte_member_id",   label: "SCTE member #" },
+  { key: "reference_id",     label: "Reference ID" },
+  { key: "submitted_at",     label: "Submitted at" },
+  { key: "importedAt",       label: "Imported at" },
+];
 
 /**
  * Render the admin Settings view into `host`.
@@ -617,7 +638,16 @@ export default async function renderSettingsEditor(host) {
     viewRosterBtn.setAttribute("aria-expanded", "false");
     viewRosterBtn.setAttribute("aria-controls", "admin-bsc-roster-panel");
 
-    actionsRow.append(uploadBtn, fileInput, spinner, viewRosterBtn);
+    const exportRosterBtn = document.createElement("button");
+    exportRosterBtn.type = "button";
+    exportRosterBtn.className =
+      "btn-secondary admin-settings-upload-card__export-btn";
+    exportRosterBtn.textContent = "Download roster CSV";
+    exportRosterBtn.addEventListener("click", () => {
+      void exportRosterCsv();
+    });
+
+    actionsRow.append(uploadBtn, fileInput, spinner, viewRosterBtn, exportRosterBtn);
     card.appendChild(actionsRow);
 
     const resultLine = document.createElement("p");
@@ -934,6 +964,33 @@ export default async function renderSettingsEditor(host) {
     const td = document.createElement("td");
     td.textContent = typeof value === "string" ? value : "";
     tr.appendChild(td);
+  }
+
+  async function exportRosterCsv() {
+    try {
+      const list = await adminReadCollection("bscPreReg", { limit: 1000 });
+      const data = (Array.isArray(list) ? list : []).slice().sort((a, b) =>
+        String(a?.attendee_name || "").localeCompare(
+          String(b?.attendee_name || ""),
+          undefined,
+          { sensitivity: "base" },
+        ),
+      );
+      const csv = toCsv(data, BSC_PREREG_COLUMNS);
+      const filename = buildCsvFilename("bscPreReg");
+      await downloadCsv(filename, csv);
+      ui.toast("success", `Exported ${data.length} row${data.length === 1 ? "" : "s"} to ${filename}.`);
+      // NOTE (deferred from Phase 1, review iteration 3 NIT #2): pushDebugLog
+      // writes to the shared debug-log ring buffer, but admin.js does not
+      // currently mount the debug overlay. The toast above is the admin-
+      // visible receipt; this log line is here so a future patch that mounts
+      // the overlay in admin surfaces this event retroactively in that session.
+      pushDebugLog("csv-export", "bscPreReg", { count: data.length, filename });
+    } catch (err) {
+      if (err?.code === "session-expired") return;
+      console.warn("[admin-settings] bscPreReg CSV export failed:", err);
+      ui.toast("error", "Couldn't build the CSV. Try again.");
+    }
   }
 
   /* ---------------- BSC roster status line ---------------- */

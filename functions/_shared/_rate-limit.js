@@ -64,3 +64,38 @@ export async function resetLoginAttempts(env, ip) {
   if (!ns) return;
   await ns.delete(KEY_PREFIX + ip);
 }
+
+/**
+ * Generic rate-limit check-and-increment against the shared
+ * `ADMIN_LOGIN_RATE` KV binding. Different key prefixes keep separate
+ * counters isolated from each other (and from the admin-login
+ * triplet above). Fails open (allows the call) if the binding is
+ * missing — same posture as `checkLoginRate` for local dev.
+ *
+ * Unlike the admin-login triplet (which only increments on failure
+ * and resets on success), this helper counts every request — the
+ * caller is expected to use it for endpoints where every submit is a
+ * legitimate write that spends the same quota as a failed one. See
+ * design section "Semantics clarification".
+ *
+ * @param {Object} env
+ * @param {Object} opts
+ * @param {string} opts.ip
+ * @param {string} opts.keyPrefix   e.g. "vendorday2027:bsc-register:"
+ * @param {number} opts.max         requests allowed in the window
+ * @param {number} opts.windowSec   KV TTL for the counter
+ * @returns {Promise<{ok: true} | {ok: false, retryAfterSec: number}>}
+ */
+export async function checkAndRecordRate(env, { ip, keyPrefix, max, windowSec }) {
+  const ns = kv(env);
+  if (!ns) return { ok: true };
+  const key = keyPrefix + ip;
+  const raw = await ns.get(key);
+  const count = raw ? Number.parseInt(raw, 10) : 0;
+  const current = Number.isFinite(count) && count >= 0 ? count : 0;
+  if (current >= max) {
+    return { ok: false, retryAfterSec: windowSec };
+  }
+  await ns.put(key, String(current + 1), { expirationTtl: windowSec });
+  return { ok: true };
+}

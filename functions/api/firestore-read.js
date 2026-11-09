@@ -32,6 +32,11 @@ const ALLOWED_COLLECTIONS = new Set([
   // listing through this endpoint is the sanctioned path for the
   // Settings page's "View roster" panel.
   "bscPreReg",
+  // `signIns` is the Phase 1 live attendee sign-in record. Attendee
+  // clients `create` directly (rule-gated); nobody can `read` or
+  // `list` from the client. The admin Sign-Ins dashboard reads here
+  // via the service account, bypassing rules.
+  "signIns",
 ]);
 const DOC_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 const DEFAULT_LIMIT = 500;

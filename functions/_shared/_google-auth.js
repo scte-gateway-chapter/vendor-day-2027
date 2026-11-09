@@ -163,6 +163,100 @@ export async function firestoreRequest(env, { method, path, body, query }) {
 }
 
 /**
+ * Count every document in a collection by paging the Firestore REST
+ * `GET documents/{collection}?pageSize=1000` endpoint until the server
+ * stops returning a `nextPageToken`. We deliberately do NOT use the
+ * `:runAggregationQuery` custom method because the shared
+ * `firestoreRequest` helper always builds its URL as `${base}/${path}`,
+ * which inserts a stray slash before the colon and 404s the aggregation
+ * call. See design "Post-import bookkeeping" → Option C.
+ *
+ * Extracted from `functions/api/bsc-roster-upload.js` so both the
+ * roster uploader and the standalone `/api/bsc-register` endpoint
+ * share one count helper (design wire-level contract 6).
+ *
+ * @param {Object} env
+ * @param {string} collectionId
+ * @returns {Promise<number>}
+ */
+export async function firestoreCountCollection(env, collectionId) {
+  let total = 0;
+  let pageToken = null;
+  do {
+    const query = { pageSize: "1000" };
+    if (pageToken) query.pageToken = pageToken;
+    const result = await firestoreRequest(env, {
+      method: "GET",
+      path: collectionId,
+      query,
+    });
+    const page = Array.isArray(result?.documents) ? result.documents : [];
+    total += page.length;
+    pageToken =
+      typeof result?.nextPageToken === "string" && result.nextPageToken
+        ? result.nextPageToken
+        : null;
+  } while (pageToken);
+  return total;
+}
+
+/**
+ * Run a Firestore structured query against the project's default
+ * database. Direct `fetch` against the `documents:runQuery` custom
+ * method rather than routing through `firestoreRequest`: that helper
+ * always builds its URL as `${base}/${path}`, which would insert a
+ * stray slash before the colon and 404 the custom method (same reason
+ * `firestoreCountCollection` paginates instead of using
+ * `:runAggregationQuery`).
+ *
+ * Returns the raw array response, i.e. `[{ document, readTime }, ...]`
+ * (or `[{ readTime }]` for an empty match). Non-2xx responses throw an
+ * Error shaped identically to `firestoreRequest` with `.status` and
+ * `.body` attached so callers can branch on HTTP status.
+ *
+ * @param {Object} env
+ * @param {Object} structuredQuery Firestore structured query body
+ *   (the `structuredQuery` sub-object of a `:runQuery` request).
+ * @returns {Promise<Array<Object>>}
+ */
+export async function firestoreRunQuery(env, structuredQuery) {
+  const projectId = getProjectId(env);
+  const token = await getAccessToken(env);
+  const url =
+    `https://firestore.googleapis.com/v1/projects/${projectId}` +
+    `/databases/(default)/documents:runQuery`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ structuredQuery }),
+  });
+  const text = await res.text();
+  let parsed = null;
+  if (text) {
+    try {
+      parsed = JSON.parse(text);
+    } catch (_err) {
+      // Non-JSON responses are left as-is for logging below.
+    }
+  }
+  if (!res.ok) {
+    const message =
+      parsed?.error?.message ||
+      (typeof parsed === "string" ? parsed : null) ||
+      text ||
+      `Firestore runQuery failed with ${res.status}`;
+    const err = new Error(message);
+    err.status = res.status;
+    err.body = parsed ?? text;
+    throw err;
+  }
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+/**
  * Convert a plain JS object into Firestore's typed document shape:
  * `{ fields: { foo: { stringValue: "..." }, bar: { integerValue: "42" }, ... } }`.
  *
