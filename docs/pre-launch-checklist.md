@@ -706,9 +706,9 @@ on event morning.
       Cloudflare → Pages → the project → Settings → Variables and
       Secrets shows `ZAPIER_BSC_WEBHOOK_URL` present for both
       Production and Preview. The value matches the Catch Hook URL on
-      the trigger step of the Broadband Skills Challenge Registration
-      2026 Zap in Zapier (currently
-      `https://hooks.zapier.com/hooks/catch/26705916/ux6k1ic/`).
+      the trigger step of the current Broadband Skills Challenge
+      Registration Zap in Zapier. The raw URL is NOT committed to this
+      repository — reference it as `<ZAPIER_BSC_WEBHOOK_URL>` only.
       _(Req 14.11.2, 14.11.3)_
 
 - [ ] 1a. **BSC Zap trigger sample is fresh and mappings are current.**

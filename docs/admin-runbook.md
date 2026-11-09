@@ -591,6 +591,45 @@ Sign-ins not landing in the Sheet:
 6. **If some Sheet columns populate but others are blank,** the Zap's
    trigger sample is stale. See **Zapier staleness** below.
 
+### Webhook URLs never land in committed files
+
+**Rule:** raw Zapier Catch Hook URLs (and any other secret-shaped
+value) live ONLY in Cloudflare Pages env vars. They must NEVER appear
+in files committed to this repository — not in `public/`, not in
+`docs/`, not in `.kiro/specs/`, not in test scripts, not in
+troubleshooting examples, not in commit messages. When a doc needs to
+reference a webhook URL, use the placeholder form of the env var name
+(e.g., `<ZAPIER_BSC_WEBHOOK_URL>`).
+
+**Why:** this repository is public on GitHub. Scanners like
+GitGuardian flag committed webhook URLs within minutes, and anyone
+can submit entries to the chapter's downstream systems using an
+exposed URL. If a leak occurs, remediation requires rotating the Zap
+in Zapier (not just removing the URL from current files, because git
+history is permanent).
+
+**Before any PR or commit touching docs/specs:** grep the diff for
+the Zapier Catch Hook URL pattern (`https://` + `hooks.zapier.com` +
+`/hooks/catch/`) and for any 7-character alphanumeric Catch Hook
+short-ID that is NOT already behind a placeholder like
+`<ZAPIER_*_WEBHOOK_URL>`. If a match appears, replace with the
+placeholder form before committing.
+
+**If a leak is detected after the fact:**
+
+1. Rotate the Zap's Catch Hook URL in Zapier (delete the Zap and
+   recreate, or use the trigger step's **Change URL** action if
+   available). The leaked value becomes immediately useless.
+2. Update the Cloudflare env var to the new URL. Retrigger the latest
+   Pages deploy so the client picks up the new value.
+3. If a GoDaddy page or any other external surface held the same URL,
+   update that too. Republish.
+4. Scrub the raw URL from the current files in the repo; replace with
+   the placeholder form.
+5. Commit the scrub with a clear message so audit logs show the fix.
+6. Verify the rotation held: fire a test POST at the old URL from
+   `curl` — it should return 404.
+
 ### Zapier staleness — why reused Zaps need re-sampling each year
 
 This applies to both the sign-in Zap and the BSC Zap, and to any future

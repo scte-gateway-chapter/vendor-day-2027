@@ -306,7 +306,7 @@ The app's year is baked in — 2027. Each future year gets a fresh deployment un
 1. WHEN `scripts/seed-app-settings.js` runs THEN it SHALL include `bscEnabled: false`, `bscWaiverMode: "paper"`, `bscWaiverText: ""`, `bscRosterCount: 0`, and `bscRosterLastImportedAt: null` in the seeded `appSettings/singleton` document, alongside the existing fields.
 2. WHEN `/api/config` responds THEN the body SHALL include `bscWebhookUrl: env.ZAPIER_BSC_WEBHOOK_URL || null` alongside the existing fields; no other secret SHALL be added.
 3. IF `ZAPIER_BSC_WEBHOOK_URL` is unset in the Cloudflare env THEN the attendee BSC flow SHALL render a graceful "BSC check-in is not yet configured" placeholder on `#/bsc` (same pattern as the sign-in view handles a missing `signInWebhookUrl`) and SHALL log a console warning rather than throwing.
-4. WHEN any client code reads the BSC Zap URL THEN it SHALL come from `bscWebhookUrl` on `/api/config`; the system SHALL NOT hardcode `https://hooks.zapier.com/hooks/catch/26705916/ux6k1ic/` (or any webhook URL) anywhere in `public/`.
+4. WHEN any client code reads the BSC Zap URL THEN it SHALL come from `bscWebhookUrl` on `/api/config`; the system SHALL NOT hardcode the Zapier Catch Hook URL (the raw value of `<ZAPIER_BSC_WEBHOOK_URL>` or any other webhook URL) anywhere in `public/`, `docs/`, or `.kiro/specs/`. The raw value lives only in Cloudflare Pages env vars.
 
 ### Requirement 15 — Live sign-ins admin view + CSV export
 
