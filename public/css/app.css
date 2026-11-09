@@ -2442,6 +2442,22 @@ a:focus-visible {
   gap: var(--space-md);
 }
 
+/* Standalone BSC pre-registration view (#/pre-register-bsc). Mirrors the
+   .signin-body outer rhythm so the sticky-header + body chrome reads the
+   same as the attendee Sign-In view; the form itself reuses the shared
+   `.signin-form` primitive via class name, no new form CSS required. */
+.pre-register-view {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+.pre-register-view__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
 .signin-intro {
   margin: 0;
   color: var(--secondary-text);
@@ -2917,7 +2933,7 @@ a:focus-visible {
    the sign-in body width; sub-steps are DOM swaps inside it. Chips reuse
    the same success / warning / neutral tokens the admin dashboard uses
    so the status language reads consistently across surfaces. No new
-   animations — the shared @media (prefers-reduced-motion: reduce) rules
+   animations ï¿½ the shared @media (prefers-reduced-motion: reduce) rules
    above already govern .signin-submit-btn and skeleton rows. */
 
 .bsc-view {

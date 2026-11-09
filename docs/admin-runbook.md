@@ -965,6 +965,163 @@ toggle `aria-sort`.
 
 ---
 
+## Live sign-ins dashboard
+
+Phase 1 adds a new admin tab at `#/signins` that reads the Firestore
+`signIns` collection directly. Each attendee sign-in from the in-app
+form writes two records today: the existing Google Sheet row (via the
+Zap, unchanged) and a new one-row-per-attendee Firestore document.
+The Sign-Ins tab is the admin-facing view on the Firestore side; the
+Google Sheet keeps running as the audit + email backup.
+
+**One row per attendee in Firestore vs two rows in the Sheet.** When
+an attendee signs in without checking the BSC competitor box, is
+found in the pre-reg roster, and then accepts the "We see you're
+pre-registered — want to check in?" prompt, the Zapier Sheet row
+pattern produces TWO rows (first `bsc_competitor=no`, then
+`bsc_competitor=yes`, both sharing the original `signed_in_at`) —
+that behavior is documented in the Sign-In Integration section above
+and is unchanged in Phase 1. The Firestore side does better: the
+retroactive accept PATCHes the SAME `signIns/{docId}` document from
+`bsc_competitor=no` to `bsc_competitor=yes` (via the new public
+`/api/signin-mark-bsc` endpoint) and sets `updatedAt`, so the
+Sign-Ins dashboard reads one-row-per-attendee without a dedupe pass.
+
+**Columns and controls.** Nine columns in order: Name, Company,
+Office location, Email, Phone, SCTE member #, Sign-in time
+(relative, with the ISO timestamp as the hover title), BSC Competitor
+badge, Source badge. Default sort is Sign-in time DESC with Name ASC
+as the tie-breaker; click Name or Sign-in time to re-sort. One filter
+chip (BSC Competitor: All / Yes / No) and a 300ms-debounced search
+that matches case-insensitive substring on name OR email. The header
+strip reads `N sign-ins · M today` where "today" is a local-day
+comparison (not a UTC-string slice) so an admin in US Central doesn't
+see mid-evening sign-ins mis-counted into the next day.
+
+**Live refresh behavior.** 30-second polling gated on
+`document.visibilityState === "visible"`; cached rows preserved on
+poll failure with an inline Retry banner; 1000-row read ceiling —
+2027 is budgeted at ~200 sign-ins so the ceiling is documentary.
+Offline banner surfaces when the browser loses connectivity and the
+poll suspends until the `online` event fires.
+
+**Download CSV.** The sticky header carries a Download CSV button
+that fetches the collection fresh via the admin broker (not the
+30-second cached rows), builds an RFC-4180 CSV with UTF-8 BOM and
+snake_case headers, and triggers a browser download named
+`signIns-YYYYMMDD-HHMMSS.csv`. The CSV emits every field on the row
+INCLUDING `signed_in_at`, `createdAt`, and `updatedAt` so the Zapier
+locale-string + the admin-side ISO timestamps all round-trip. Three
+other admin tabs (BSC Check-Ins, BSC Pre-Reg roster panel in
+Settings, Attendees) get the same button with the same semantics.
+
+**Phase 1 → Phase 3 narrative.** Phase 1 lands this view
+non-destructively — both the Zapier POST and the Firestore create
+fire for every sign-in, and both the Google Sheet and this dashboard
+show the same data. Phase 2 is a real-use validation window with
+both sources running in parallel. Phase 3 retires the Zapier leg once
+Firestore is proven stable, and the Google Sheet becomes a historical
+archive. If the Firestore side ever disagrees with the Sheet during
+Phase 1, the Sheet is authoritative — the board already knows how
+to read it.
+
+---
+
+## BSC pre-registration page
+
+Phase 1 adds a URL-only standalone pre-registration page at
+`#/pre-register-bsc` for managers who want to pre-register their
+technicians directly into Firestore without the Google Form hop. The
+page is NOT linked from any attendee-facing navigation and is NOT
+gated by the `bscEnabled` toggle, so managers can pre-register
+before the day-of toggle flips.
+
+**Sharing the URL.** Send the full URL (`https://<deployment-host>/#/pre-register-bsc`)
+to managers out-of-band — email, chat, printed on the booth briefing
+sheet. There is no auth and the only backstop against spam is the
+server-side rate limit of 10 submissions per IP per hour (shared KV
+counter, isolated prefix from the admin-login counter). If a group of
+managers is pre-registering a batch from the same office IP and hits
+the ceiling, they'll see a "Too many submissions from this network"
+Retry message and should wait an hour or use the admin roster CSV
+upload instead.
+
+**Fields and merge semantics.** The form captures 9 fields:
+Competitor name, Email, Company, Office location, Job role,
+Supervisor name, Supervisor email, Supervisor phone, SCTE member #
+(optional). On submit the server upserts `bscPreReg/{emailLowered}`
+with set+merge semantics, generates a `BSC-YYYYMMDD-HHMMSS` reference
+id (4-char hex suffix on collision), and refreshes the roster count
+on `appSettings/singleton` so the Settings panel's status line
+updates on the next refresh.
+
+**Re-submission semantics.** Re-submissions by the same email
+overwrite every stored field, **including `reference_id`**. The
+latest confirmation card always shows the authoritative reference id
+for a given email; any older `BSC-YYYYMMDD-HHMMSS` the manager wrote
+down from a prior submit is NOT retrievable from the Firestore
+roster. This is a deliberate departure from the CSV-import path
+(which preserves the id from the sheet) because the standalone form
+has no stable "original row" concept — if a manager needs the
+historical id, pull it from the browser's visible history or the
+Google Form Zap backup for that email.
+
+**No email confirmation in Phase 1.** The standalone page does NOT
+send a confirmation email on submit. The existing Broadband Skills
+Challenge Registration 2026 Google Form keeps running and keeps
+emailing confirmations for managers who prefer that intake path. The
+two intake paths both write into the same `bscPreReg` collection
+(the CSV upload re-syncs from the Google Form Sheet; the standalone
+page upserts directly), and the admin runbook captures the preference
+for the Google Form among older attendees who want an email receipt.
+A future phase may add email confirmations to the standalone page if
+the mix tilts away from the Google Form, but that is deliberately
+deferred — the Zap-and-email stack is already working and Phase 1 is
+not the right time to re-litigate it.
+
+**Retiring the Google Form later.** Once the standalone page has
+captured a season or two of pre-registrations and the admin team is
+comfortable with the merge semantics, the Google Form Zap can be
+retired. The retirement path: stop sharing the Google Form link,
+replace the admin runbook's Google Form section with the
+`#/pre-register-bsc` section, and (optionally) run the Google Form's
+historical responses CSV through the Admin → Settings → "Upload BSC
+roster (CSV)" button one last time to ensure every historical entry
+is reflected in `bscPreReg` before the Form is archived.
+
+---
+
+## Vendor Registration — attendee reconciliation (TODO for a future phase)
+
+The chapter's Vendor Day Vendor Registration form (hosted on
+GoDaddy, HTML the chapter already owns) captures the person who
+filled out the form and paid for the booth. That is NOT necessarily
+the same person — or the only person — who actually attends the show
+and staffs the booth. In practice some sponsors pay via one contact
+and send a different (or multiple) technicians to the floor, so the
+pre-event attendee directory import built from the GoDaddy
+form-fed roster is less accurate than it could be.
+
+**What a future phase could add.** A per-booth attendee-list capture
+step at check-in — when a vendor arrives, the booth coordinator
+collects or confirms the names of the people actually attending for
+that booth and writes them into the attendee directory alongside the
+payer record. This would turn the pre-event import list into a
+reliable "expected attendees" roster rather than a payer roster.
+
+**Why not in Phase 1.** The GoDaddy page uses the chapter's eCommerce
+tools to collect payment, and disrupting that payment flow — or
+trying to recreate it in the PWA — is more work and risk than the
+current gap justifies. The current implementation leaves the GoDaddy
+form unchanged, pays attention to the gap, and defers the fix to a
+later phase when the PWA has fully absorbed the sign-in and BSC
+intake paths and the Vendor Registration path is the last Zap-fed
+holdout. Flagged here so an admin reading the runbook understands
+why the Vendor Day attendee directory may not perfectly match the
+list of booth payers.
+
+---
+
 ## Debug overlay
 
 The attendee app ships with a hidden on-device diagnostic overlay for

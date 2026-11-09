@@ -222,16 +222,27 @@ export function renderTabBar(active) {
 export function setActiveTab(active) {
   const mount = document.getElementById("app-tab-bar");
   if (!mount) return;
-  mount.querySelectorAll("[data-tab]").forEach((btn) => {
+  const buttons = Array.from(mount.querySelectorAll("[data-tab]"));
+  let selectedBtn = null;
+  buttons.forEach((btn) => {
     const match = btn.getAttribute("data-tab") === active;
     btn.setAttribute("aria-selected", match ? "true" : "false");
-    btn.setAttribute("tabindex", match ? "0" : "-1");
     if (match) {
+      selectedBtn = btn;
       btn.setAttribute("aria-current", "page");
     } else {
       btn.removeAttribute("aria-current");
     }
   });
+  // Preserve the ARIA tablist roving-tabindex: exactly one button in the
+  // group must be reachable via Tab. When no button matches `active`
+  // (e.g. the "none" sentinel used for #/pre-register-bsc), fall back to
+  // the first tab (Home) so keyboard users can still navigate out of a
+  // standalone view via the primary nav.
+  const tabbable = selectedBtn || buttons[0] || null;
+  buttons.forEach((btn) =>
+    btn.setAttribute("tabindex", btn === tabbable ? "0" : "-1"),
+  );
 }
 
 /**

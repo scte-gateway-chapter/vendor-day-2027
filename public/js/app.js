@@ -36,6 +36,7 @@ import { renderFeedback } from "./views/feedback.js";
 import { renderRecap } from "./views/recap.js";
 import { renderSignIn } from "./views/signin.js";
 import { renderBsc } from "./views/bsc.js";
+import { renderPreRegisterBsc } from "./views/pre-register-bsc.js";
 import {
   initOneSignal,
   getSubscriptionState,
@@ -71,6 +72,10 @@ const ROUTE_TO_TAB = {
   "#/sign-in": "more",
   "#/bsc": "home",
   "#/about-install": "more",
+  // pre-reg is a standalone manager form reached only by URL; it is not
+  // part of the attendee shell's primary nav, so no tab lights up on it.
+  // ui.setActiveTab("none") leaves Home keyboard-reachable (see ui.js).
+  "#/pre-register-bsc": "none",
 };
 
 /* ----------------- Per-view cleanup registry ----------------- */
@@ -503,6 +508,9 @@ async function main() {
   router.register("#/recap", () => ui.showView((root) => renderRecap(root)));
   router.register("#/sign-in", () => ui.showView((root) => renderSignIn(root)));
   router.register("#/bsc", () => ui.showView((root) => renderBsc(root)));
+  router.register("#/pre-register-bsc", () =>
+    ui.showView((root) => renderPreRegisterBsc(root)),
+  );
   router.register("#/about-install", renderAboutInstall);
   router.register("*", render404);
 
@@ -513,9 +521,12 @@ async function main() {
 
   // After each navigation, update the active tab reflection. The router passes
   // the matched route pattern (not the raw hash) so ROUTE_TO_TAB keys line up.
+  // Pass the sentinel through — `#/pre-register-bsc` maps to "none" so no
+  // tab lights up; `ui.setActiveTab` preserves one keyboard-tabbable button
+  // (Home) when the active value matches no `data-tab`.
   router.afterEach((ctx) => {
-    const tab = ROUTE_TO_TAB[ctx.path] || null;
-    if (tab) ui.setActiveTab(tab);
+    const tab = ROUTE_TO_TAB[ctx.path] || "none";
+    ui.setActiveTab(tab);
   });
 
   // Initialize Firestore config in the background. Views that need it await

@@ -21,7 +21,7 @@
 // Zapier) is the source of truth. The design doc covers the rationale.
 "use strict";
 
-import { initFirestore, getDoc } from "../firebase.js";
+import { initFirestore, getDoc, createDoc } from "../firebase.js";
 import { loadAppSettings, isSignInEnabled, isBscEnabled } from "../app-settings.js";
 import * as router from "../router.js";
 import * as ui from "../ui.js";
@@ -43,6 +43,15 @@ const LAST_SUBMISSION_KEY = "vendorday2027.signin.lastSubmission";
 const BSC_PROMPT_SUPPRESS_KEY = "vendorday2027.bsc.promptSuppressSubmittedAt";
 const BSC_RETURN_AFTER_SIGNIN_KEY = "vendorday2027.bsc.returnAfterSignIn";
 const BSC_PRECHECK_ON_SIGNIN_KEY = "vendorday2027.bsc.preCheckOnSignIn";
+
+/** Phase 1 dual-write: id of the just-created `signIns/{docId}` document.
+ *  Written from the chained Firestore create on sign-in success; read by
+ *  the retroactive `/api/signin-mark-bsc` call when the attendee accepts
+ *  the pre-reg prompt. Module-scoped is the authoritative source during
+ *  the current page lifetime; the localStorage mirror below survives a
+ *  reload between sign-in and the retroactive prompt. */
+let lastSignInDocId = null;
+const SIGNIN_LAST_DOC_ID_KEY = "vendorday2027.signin.lastDocId";
 
 /**
  * Render the Sign-In view into `host`.
@@ -280,6 +289,32 @@ function renderForm(host, webhookUrl) {
       writeLastSubmission(record);
       ui.toast("success", "You're signed in \u2014 thanks!");
       renderConfirmationCard(host, record);
+      // Phase 1 dual-write: chained Firestore `signIns` create.
+      //
+      // Chained AFTER Zapier success. Fire-and-forget — the submit
+      // handler does not await this and the confirmation card has
+      // already rendered. Chaining (vs. the brief's original "parallel
+      // / Promise.allSettled" wording in confirmed decision 4) closes
+      // two race paths the design review iteration 3 flagged on the
+      // parallel-with-guard orchestration:
+      //   (a) Zapier rejects while a parallel Firestore create is still
+      //       in flight → user clicks Retry → second create fires
+      //       because the first hasn't resolved yet → duplicate row.
+      //   (b) Firestore write actually succeeds but the client-side
+      //       10s timeout rejects first → state gets cleared → retry
+      //       fires a second create → duplicate row + orphan.
+      // Chaining eliminates both: the Firestore leg only ever runs
+      // after Zapier returned 2xx, and Zapier-2xx means the retry
+      // banner is never shown, so there is no mechanism for a second
+      // submit on this page lifecycle. (The attendee can still "Sign
+      // in as someone else" which calls clearLastSubmission() → both
+      // state slots cleared → fresh submit cycle is correctly
+      // independent.) The brief's stronger clauses — "Do NOT block UI
+      // on either" and "Confirmation card renders as soon as the
+      // Zapier POST resolves" — are honored verbatim; attendee-visible
+      // latency is unchanged. Supersedes decision 4's "IN PARALLEL"
+      // wording per design iteration 4 (correctness over performance).
+      kickOffSignInsCreate(payload);
       // Post-submit BSC routing. Runs after the confirmation card
       // renders so a slow Firestore GET never delays the attendee's
       // "You're signed in" feedback. The original `payload` and the
@@ -511,6 +546,86 @@ function hideBanner(el) {
   el.innerHTML = "";
 }
 
+/* ---------------- Firestore signIns dual-write ---------------- */
+
+/**
+ * Fire the chained Firestore write of the sign-in record. Returns a
+ * promise that resolves to the created doc (with `.id`) or rejects on
+ * any underlying createDoc failure (non-2xx, network, CORS, etc). The
+ * caller runs this AFTER the Zapier POST resolves 2xx and attaches
+ * .then/.catch; the submit handler does not await it.
+ *
+ * Deliberately NO Promise.race timeout wrapper: a client-side timeout
+ * that rejects while Firestore actually wrote would orphan a doc and
+ * (worse, in the pre-iteration-4 design) clear state so a retry
+ * duplicates the row. Chaining eliminates the retry-duplicate risk
+ * entirely, so we let the underlying fetch resolve or reject on its
+ * own schedule. Observational "slow write" logging lives in the caller
+ * (`kickOffSignInsCreate`) and is purely a debug-feed signal.
+ */
+async function createSignInDoc(payload) {
+  const doc = {
+    attendee_name:      payload.attendee_name,
+    company:            payload.company,
+    office_location:    payload.office_location,
+    phone:              payload.phone,
+    email:              (payload.email || "").trim().toLowerCase(),
+    scte_member_number: payload.scte_member_number || "",
+    signed_in_at:       payload.signed_in_at,       // same locale string as Zap
+    bsc_competitor:     payload.bsc_competitor,     // "yes" | "no"
+    source:             "app",
+    createdAt:          new Date().toISOString(),
+  };
+  return await createDoc("signIns", doc);
+}
+
+/**
+ * Fire-and-forget wrapper around `createSignInDoc`. Writes the returned
+ * docId into both module state and `localStorage` on success so the
+ * retroactive `/api/signin-mark-bsc` call in `openPreRegPrompt → go()`
+ * can target the correct row. On failure, logs and leaves state alone
+ * (the chain only runs after a Zapier success, so there is no stale
+ * state to clear from this submit's own prior attempt).
+ */
+function kickOffSignInsCreate(payload) {
+  // Observational "slow write" log at 10s. Instrumentation ONLY — does
+  // NOT reject the create, does NOT clear state, does NOT trigger a
+  // retry. The underlying fetch inside createDoc will eventually
+  // resolve or reject on its own schedule; chaining means a slow-but-
+  // successful write still lands with the correct docId in state (no
+  // orphan path).
+  const slowLogTimer = setTimeout(() => {
+    pushDebugLog("signin", "signIns create slow (>10s), still waiting", {});
+  }, 10000);
+  createSignInDoc(payload)
+    .then((doc) => {
+      clearTimeout(slowLogTimer);
+      if (!doc || !doc.id) {
+        pushDebugLog("signin", "signIns create returned no id", { doc });
+        return;
+      }
+      lastSignInDocId = doc.id;
+      try { localStorage.setItem(SIGNIN_LAST_DOC_ID_KEY, doc.id); } catch (_err) { /* no-op */ }
+      pushDebugLog("signin", "signIns created", {
+        docId: doc.id,
+        email: (payload.email || "").trim().toLowerCase(),
+      });
+    })
+    .catch((err) => {
+      clearTimeout(slowLogTimer);
+      // Do NOT touch lastSignInDocId / SIGNIN_LAST_DOC_ID_KEY here.
+      // The chain only runs after a successful Zapier POST, so there
+      // is no stale state to clear from a prior attempt in this page
+      // lifecycle, and clearing them now would open the door to a
+      // confusingly-empty retroactive flow if the user accepts the
+      // pre-reg prompt before this .catch fires.
+      pushDebugLog("signin", "signIns create FAILED", {
+        err: String(err && err.message || err),
+      });
+      console.warn("[signin] signIns create failed:", err);
+    });
+}
+
 /* ---------------- Webhook POST ---------------- */
 
 /**
@@ -648,9 +763,14 @@ function clearLastSubmission() {
   try {
     localStorage.removeItem(LAST_SUBMISSION_KEY);
     localStorage.removeItem(BSC_PROMPT_SUPPRESS_KEY);
+    localStorage.removeItem(SIGNIN_LAST_DOC_ID_KEY);
   } catch (err) {
     console.warn("[signin] last-submission clear failed:", err);
   }
+  // Phase 1 dual-write: reset the module-scoped signIns docId alongside
+  // the localStorage mirror so "Sign in as someone else" starts a fresh
+  // session with both slots empty.
+  lastSignInDocId = null;
   try {
     sessionStorage.removeItem(BSC_RETURN_AFTER_SIGNIN_KEY);
     sessionStorage.removeItem(BSC_PRECHECK_ON_SIGNIN_KEY);
@@ -808,6 +928,73 @@ function openPreRegPrompt(record, originalPayload, webhookUrl) {
             err: String(err && err.message || err),
           });
         });
+    }
+
+    // Phase 1 retroactive Firestore update: alongside the existing
+    // retroactive Zapier POST above, flip `bsc_competitor: no → yes`
+    // on the Firestore `signIns/{docId}` row created at sign-in time
+    // so the admin dashboard reads one-row-per-attendee (vs the two-
+    // row-on-retroactive-yes behavior the Google Sheet produces by
+    // design). Prefer the module-scoped in-memory id so same-session
+    // accepts hit the freshest value; fall back to localStorage so
+    // a reload-then-accept flow still targets the correct row. Both
+    // fire-and-forget; the dialog dismisses and `#/bsc` navigation
+    // already happen immediately on click so neither can stall the UI.
+    let signInDocId = lastSignInDocId;
+    if (!signInDocId) {
+      try { signInDocId = localStorage.getItem(SIGNIN_LAST_DOC_ID_KEY) || ""; }
+      catch (_err) { signInDocId = ""; }
+    }
+    const markEmail = (originalPayload && typeof originalPayload.email === "string")
+      ? originalPayload.email.trim().toLowerCase()
+      : "";
+    if (signInDocId && markEmail) {
+      // Reuse the existing retroactive-Zap timeout constant so both
+      // retroactive POSTs (Zapier + mark-bsc) move together under one
+      // named value — see design iteration 2 NIT #7.
+      const markRace = Promise.race([
+        fetch("/api/signin-mark-bsc", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ docId: signInDocId, email: markEmail }),
+        }).then(async (res) => {
+          if (!res.ok) {
+            const err = new Error(`signin-mark-bsc ${res.status}`);
+            err.status = res.status;
+            throw err;
+          }
+          return res.json();
+        }),
+        new Promise((_, reject) =>
+          setTimeout(
+            () => reject(new Error(`signin-mark-bsc timed out after ${BSC_RETROACTIVE_POST_TIMEOUT_MS}ms`)),
+            BSC_RETROACTIVE_POST_TIMEOUT_MS,
+          ),
+        ),
+      ]);
+      markRace
+        .then((r) => {
+          // Success response is { ok: true }; log the ok flag, not the
+          // absent `reason` field (which is only present on failure).
+          pushDebugLog("signin", "signin-mark-bsc OK", {
+            docId: signInDocId,
+            ok: r && r.ok === true,
+          });
+          // Optional tidy-up: clear both state slots so a subsequent
+          // accept (via browser back nav + re-accept) no longer finds
+          // the same id.
+          lastSignInDocId = null;
+          try { localStorage.removeItem(SIGNIN_LAST_DOC_ID_KEY); } catch (_err) { /* no-op */ }
+        })
+        .catch((err) => {
+          pushDebugLog("signin", "signin-mark-bsc FAILED", {
+            err: String(err && err.message || err),
+          });
+        });
+    } else {
+      pushDebugLog("signin", "signin-mark-bsc SKIPPED (no docId or email)", {
+        haveDocId: Boolean(signInDocId),
+      });
     }
 
     try { localStorage.removeItem(BSC_PROMPT_SUPPRESS_KEY); } catch (_err) { /* no-op */ }

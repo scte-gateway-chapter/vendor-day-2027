@@ -875,6 +875,87 @@ on event morning.
 
 ---
 
+## Section 6c — Live sign-ins + pre-reg
+
+Validates the Phase 1 Firestore-backed sign-in dashboard, the
+retroactive BSC-yes update endpoint, the standalone BSC pre-reg page,
+and the CSV export affordance across the four admin tabs. All items
+presume Sections 1-6b all pass. Phase 1 runs non-destructively
+alongside the existing Zap + Google Sheet paths — every item here
+confirms the net-new Firestore path works without disturbing the
+existing flows.
+
+- [ ] 1. **`signIns` Firestore rule deployed.** `firestore.rules`
+      contains a `match /signIns/{signInId}` block granting
+      `allow create: if true` and denying `allow read, list, update,
+      delete`. Rules deployed via Firebase CLI; the deployed version
+      matches the committed rule file.
+
+- [ ] 2. **`/api/signin-mark-bsc` reachable.** Curl or browser-devtools
+      POST a JSON `{ docId, email }` payload to `/api/signin-mark-bsc`
+      on the deployment URL. Expected behaviors: 404 on a non-existent
+      docId; 404 on a docId that exists but with a mismatched email;
+      200 `{ ok: true }` on a matched docId + email. Both 404 branches
+      return the SAME `{ ok: false, reason: "not-found" }` body.
+
+- [ ] 3. **`/api/bsc-register` reachable.** `curl -X POST` a URL-encoded
+      body with the 9 required fields to `/api/bsc-register`. Expected:
+      200 `{ ok: true, reference_id: "BSC-...", email: "..." }` on a
+      valid submit; 400 `{ ok: false, reason: "<field> required" }` on
+      a missing required field; 429 `{ ok: false, reason:
+      "rate-limited", retryAfterSec: 3600 }` after 10 successful
+      submits from the same IP in an hour.
+
+- [ ] 4. **`#/pre-register-bsc` renders and submits.** Open the URL in
+      a browser (incognito recommended so no admin JWT is in play).
+      The sticky header reads "BSC Pre-Registration"; the 9-field
+      form renders; submitting with valid values returns a
+      confirmation card showing the competitor name and reference id;
+      submitting with an invalid email surfaces the inline validator
+      with focus on the first invalid field. The URL is NOT linked
+      from any attendee-facing nav — confirm Home, More menu, and the
+      bottom tab bar do not expose it.
+
+- [ ] 5. **Admin Sign-Ins tab shows a live row after a smoke-test
+      sign-in.** Submit the attendee sign-in form in another browser
+      tab (any valid fields). Within 30s the admin Sign-Ins dashboard
+      shows the new row with Source badge "App" and BSC Competitor
+      "No" (or "Yes" if the checkbox was checked). Accept the pre-reg
+      prompt from a sign-in where the roster has a matching email —
+      within 30s the SAME row flips BSC Competitor to "Yes" (no
+      second row appears).
+
+- [ ] 6. **CSV exports well-formed across all four tabs.** Click
+      Download CSV on the Sign-Ins dashboard, the BSC Check-Ins
+      dashboard, the Settings → BSC Pre-Reg "Download roster CSV"
+      button, and the Attendees → "Export current directory as CSV"
+      button. For each file: filename has the shape
+      `<collection>-YYYYMMDD-HHMMSS.csv`; opens cleanly in Excel on
+      Windows AND Google Sheets without garbled non-ASCII (UTF-8 BOM
+      present); first row is the snake_case header; subsequent rows
+      match the dashboard-visible rows (plus the audit-only columns
+      the dashboard hides). Row count stays below the 1000-row
+      ceiling for 2027's expected scale.
+
+- [ ] 7. **Vendor-registration-attendee-reconciliation TODO flagged.**
+      Confirm `docs/admin-runbook.md` has a "Vendor Registration —
+      attendee reconciliation (TODO for a future phase)" section and
+      the admin team has read it so the gap is on their radar
+      heading into event morning. _(Not actionable in Phase 1 — the
+      item is a tracked documentation checkpoint.)_
+
+| Item | Who ran | When | Pass / Fail | Notes |
+| --- | --- | --- | --- | --- |
+| 1 | | | | rules deploy build id = |
+| 2 | | | | tested doc id = |
+| 3 | | | | reference id = |
+| 4 | | | | reference id = |
+| 5 | | | | signin doc id = |
+| 6 | | | | row counts: signIns = , bscCheckins = , bscPreReg = , attendees = |
+| 7 | | | | admin acknowledging = |
+
+---
+
 ## Section 7 — Final go/no-go
 
 - [ ] 1. **Sections 1-6 (including 6a and 6b) all pass, OR every

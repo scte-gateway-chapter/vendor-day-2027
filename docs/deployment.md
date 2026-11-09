@@ -533,6 +533,14 @@ output with whoever is diagnosing. See `docs/admin-runbook.md` →
   behind a paid plan. Subscription counts and per-message delivery stats
   are still visible on the Messages page; only the user-level drill-down
   is paywalled.
+- **CSV export is capped at 1000 rows per collection.** The admin
+  Download CSV buttons (Sign-Ins, BSC Check-Ins, BSC Pre-Reg roster,
+  Attendees) fetch via `adminReadCollection(..., { limit: 1000 })` —
+  the same ceiling the on-screen dashboards use. 2027 is budgeted well
+  under 1000 across every collection so the limit is documentary;
+  future years with larger events will need server-side pagination
+  (and probably a "truncated at 1000" indicator) before an admin can
+  rely on a CSV covering the whole collection.
 
 ---
 
